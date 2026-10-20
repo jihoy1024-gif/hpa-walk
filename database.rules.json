@@ -1,0 +1,20 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$room": {
+        "peers": {
+          ".read": true,
+          "$peer": {
+            ".write": true,
+            ".validate": "newData.hasChildren(['x', 'z']) && newData.child('x').isNumber() && newData.child('z').isNumber()",
+            "nick": { ".validate": "newData.isString() && newData.val().length <= 16" },
+            "color": { ".validate": "newData.isString() && newData.val().length <= 7" },
+            "say": { "txt": { ".validate": "newData.isString() && newData.val().length <= 80" } }
+          }
+        }
+      }
+    }
+  }
+}
