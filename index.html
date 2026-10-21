@@ -1437,13 +1437,20 @@ clockHST(); setInterval(clockHST, 10000);
 
 me.tag.nm.textContent = 'You';
 renderPeers();
-// Jiho's and Isa's models load in the background; until then they show as the hand-built avatars
-if (THREE.GLTFLoader) for (const kind of ['m', 'f']) new THREE.GLTFLoader().load(MODELS[kind].url, (gltf) => {
-  if (!prepareModel(kind, gltf)) return;
-  const swap = (o, col, skin) => { if (o.av.gender !== kind || o.av.model) return; const old = o.av; o.av = makeAvatar(col, skin, kind); o.av.g.position.copy(old.g.position); o.av.g.rotation.y = old.g.rotation.y; scene.remove(old.g); };
-  swap(me, color, skinIdx);
-  for (const r of remotes.values()) swap(r, r.color, r.skin);
-}, undefined, () => {});
+// Jiho's and Isa's models load in the background; until then they show as the hand-built avatars. Each GLB ships as
+// base64 text (the artifact host doesn't serve .glb) and is decoded here before parsing.
+if (THREE.GLTFLoader) for (const kind of ['m', 'f']) {
+  fetch(MODELS[kind].url + '.txt').then((res) => (res.ok ? res.text() : Promise.reject(res.status))).then((b64) => {
+    const bin = atob(b64.trim()), buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    new THREE.GLTFLoader().parse(buf.buffer, '', (gltf) => {
+      if (!prepareModel(kind, gltf)) return;
+      const swap = (o, col, skin) => { if (o.av.gender !== kind || o.av.model) return; const old = o.av; o.av = makeAvatar(col, skin, kind); o.av.g.position.copy(old.g.position); o.av.g.rotation.y = old.g.rotation.y; scene.remove(old.g); };
+      swap(me, color, skinIdx);
+      for (const r of remotes.values()) swap(r, r.color, r.skin);
+    }, () => {});
+  }).catch(() => {});
+}
 connectRoom();
 prefillName();
 requestAnimationFrame(frame);
