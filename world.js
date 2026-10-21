@@ -207,8 +207,8 @@ function createWorld(canvas) {
   { const [cx, cz] = toWorld(bb, 45, 0); addPad(cx, cz, 55, 50, bb.rot, 14); }
   addPad(pk.x, pk.z, pk.hw + 2, pk.hd + 2, pk.rot, 8);
   for (const b of BUILDINGS) addPad(b.x, b.z, b.w / 2 + 2.5, b.d / 2 + 2.5, b.rot, 7);
-  const POOL = (() => { const [x, z] = P(1352, 673); return { x, z, rot: -33 * RAD }; })();
-  addPad(POOL.x, POOL.z, 20, 15, POOL.rot, 8);
+  const POOL = (() => { const [x, z] = P(1352, 673); return { x, z, rot: -33 * RAD, WL: 25, WW: 18, DL: 38, DW: 31, depth: 1.9 }; })();
+  addPad(POOL.x, POOL.z, 21, 17, POOL.rot, 8);
   const TENNIS = (() => { const [x, z] = P(1258, 915); return { x, z, rot: 0, hw: 36.2, hd: 22.2, eave: 7, ridge: 14, ridgeZ: 6 }; })();
   addPad(TENNIS.x - 3, TENNIS.z, TENNIS.hw + 9, TENNIS.hd + 4, TENNIS.rot, 8);
   const SOLAR_FIELD = (() => { const [x, z] = P(800, -30); return { x, z, rot: 0 }; })();
@@ -288,7 +288,9 @@ function createWorld(canvas) {
     const uv = geo.attributes.uv;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
-      pos.setY(i, groundH(x, z));
+      let gy = groundH(x, z);
+      { const [plx, plz] = toLocal(POOL, x, z); if (Math.abs(plx) < POOL.WL / 2 + 1.2 && Math.abs(plz) < POOL.WW / 2 + 1.2) gy -= POOL.depth + 0.4; } // the pool basin
+      pos.setY(i, gy);
       const n = Math.sin(x * 0.021) * Math.cos(z * 0.017) + Math.sin(x * 0.06 + z * 0.045) * 0.5 + Math.sin(x * 0.13 - z * 0.11) * 0.25;
       c.copy(lush).lerp(lush2, 0.5 + 0.5 * Math.sin(x * 0.043 + z * 0.031));
       c.lerp(dry, smooth(0.35, 1.3, n) * 0.6);
@@ -941,9 +943,6 @@ function createWorld(canvas) {
     // blue wainscot inside the walls
     const blue = new THREE.MeshStandardMaterial({ color: C('#3b86b6'), roughness: 0.7, side: THREE.DoubleSide });
     for (const [w, x, z, ry] of [[hw * 2 - 0.6, 0, -hd + 0.2, 0], [hw * 2 - 0.6, 0, hd - 0.2, Math.PI]]) { const m = add(new THREE.PlaneGeometry(w, 1.8), blue, x, 0.9, z); m.rotation.y = ry; m.castShadow = false; }
-    // dark green curtains between the courts (gaps at both ends to walk through)
-    const curtain = new THREE.MeshStandardMaterial({ color: C('#1f3a2c'), roughness: 0.95, side: THREE.DoubleSide });
-    for (const x of [-9.15, 9.15]) { const m = add(new THREE.PlaneGeometry(30, 3.4), curtain, x, 1.7, 0); m.rotation.y = Math.PI / 2; const [wx, wz] = toWorld(T, x, 0); box(wx, wz, 0.15, 15, T.rot); }
     // nets
     const netTex = canvasTex(64, 64, (c) => { c.strokeStyle = 'rgba(20,20,20,0.9)'; c.lineWidth = 2; for (let i = 0; i <= 64; i += 6) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 64); c.stroke(); c.beginPath(); c.moveTo(0, i); c.lineTo(64, i); c.stroke(); } });
     netTex.repeat.set(30, 3);
@@ -983,34 +982,101 @@ function createWorld(canvas) {
     const logo = add(new THREE.CircleGeometry(1.5, 32), new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, roughness: 0.6 }), 0, RH - 2.4, 0.05, scr); logo.castShadow = false;
   })();
 
-  // ---------- Dowsett Pool: outdoor 25 m pool with deck, coping and a changing-room wing ----------
+  // ---------- Dowsett Pool (from the HPA swim video) ----------
+  // 9-lane 25 m pool dug 1.9 m deep: white tile with black lane lines, pink-and-black lane ropes,
+  // backstroke pennants, white starting blocks and lifeguard tower, a covered seating side with a
+  // sky-blue wall, a low white wall round the deck and a curved lava-rock retaining wall below it.
+  const pool = { x: POOL.x, z: POOL.z, rot: POOL.rot, hw: POOL.WL / 2, hd: POOL.WW / 2, y: 0, depth: POOL.depth };
+  let waterTexRef = null;
   (function dowsettPool() {
-    const y = groundH(POOL.x, POOL.z);
+    const y = groundH(POOL.x, POOL.z); pool.y = y + 0.06;
     const g = new THREE.Group(); g.position.set(POOL.x, y, POOL.z); g.rotation.y = POOL.rot; scene.add(g);
-    const WL = 25, WW = 16.5, DL = 36, DW = 27;
+    const { WL, WW, DL, DW } = POOL, Dp = POOL.depth;
+    const add = (geo, mat, x, yy, z, cast) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, yy, z); m.castShadow = !!cast; m.receiveShadow = true; g.add(m); return m; };
+    // deck with the pool cut out
     const deckShape = new THREE.Shape(); deckShape.moveTo(-DL / 2, -DW / 2); deckShape.lineTo(DL / 2, -DW / 2); deckShape.lineTo(DL / 2, DW / 2); deckShape.lineTo(-DL / 2, DW / 2); deckShape.closePath();
     const hole = new THREE.Path(); hole.moveTo(-WL / 2, -WW / 2); hole.lineTo(-WL / 2, WW / 2); hole.lineTo(WL / 2, WW / 2); hole.lineTo(WL / 2, -WW / 2); hole.closePath(); deckShape.holes.push(hole);
-    const deck = new THREE.Mesh(new THREE.ShapeGeometry(deckShape).rotateX(-Math.PI / 2), overlayMat(roadTex.path, { color: C('#e8e4da') }));
-    deck.position.y = 0.12; deck.receiveShadow = true; g.add(deck);
-    const waterTex = canvasTex(512, 340, (c, W2, H2) => {
-      const gr = c.createLinearGradient(0, 0, W2, H2); gr.addColorStop(0, '#2ea8d6'); gr.addColorStop(1, '#1f8fc4'); c.fillStyle = gr; c.fillRect(0, 0, W2, H2);
-      const r = rng(31); for (let i = 0; i < 260; i++) { c.strokeStyle = 'rgba(255,255,255,' + (0.05 + r() * 0.08) + ')'; c.lineWidth = 1 + r() * 2; c.beginPath(); const x = r() * W2, yy = r() * H2; c.moveTo(x, yy); c.bezierCurveTo(x + 10, yy - 6, x + 20, yy + 6, x + 34, yy); c.stroke(); }
-      c.fillStyle = '#16507f'; for (let i = 0; i < 8; i++) { const yy = (i + 0.5) / 8 * H2; c.fillRect(W2 * 0.06, yy - 2, W2 * 0.88, 4); c.fillRect(W2 * 0.06, yy - 8, 4, 16); c.fillRect(W2 * 0.94 - 4, yy - 8, 4, 16); }
+    add(new THREE.ShapeGeometry(deckShape).rotateX(-Math.PI / 2), overlayMat(roadTex.path, { color: C('#ece8de') }), 0, 0.12, 0);
+    // basin: tiled walls and floor with lane lines
+    const tile = new THREE.MeshStandardMaterial({ color: C('#d8f1f6'), roughness: 0.4 });
+    for (const [w, d, x, z] of [[WL, 0.2, 0, WW / 2 + 0.1], [WL, 0.2, 0, -WW / 2 - 0.1], [0.2, WW, WL / 2 + 0.1, 0], [0.2, WW, -WL / 2 - 0.1, 0]]) add(new THREE.BoxGeometry(w, Dp + 0.15, d), tile, x, 0.13 - (Dp + 0.15) / 2, z);
+    const floorTex = canvasTex(1000, 720, (c, W2, H2) => {
+      c.fillStyle = '#9fe6f2'; c.fillRect(0, 0, W2, H2);
+      c.strokeStyle = 'rgba(120,170,185,0.35)'; c.lineWidth = 1; for (let x = 0; x < W2; x += 10) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, H2); c.stroke(); } for (let yy = 0; yy < H2; yy += 10) { c.beginPath(); c.moveTo(0, yy); c.lineTo(W2, yy); c.stroke(); }
+      const sx = W2 / WL, sz = H2 / WW; c.fillStyle = '#1b2430';
+      for (let i = 0; i < 9; i++) { const zc = (i + 0.5) * 2 * sz; c.fillRect(2 * sx, zc - 0.12 * sz, (WL - 4) * sx, 0.25 * sz); c.fillRect(2 * sx, zc - 0.5 * sz, 0.25 * sx, 1 * sz); c.fillRect((WL - 2.25) * sx, zc - 0.5 * sz, 0.25 * sx, 1 * sz); }
     });
-    const water = new THREE.Mesh(new THREE.PlaneGeometry(WL, WW).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: waterTex, roughness: 0.08, metalness: 0.15, emissive: C('#0b3a52'), transparent: true, opacity: 0.92 }));
-    // the terrain under the pad is solid, so the water sits just below the deck
-    water.position.y = 0.1; water.receiveShadow = true; g.add(water);
+    floorTex.wrapS = floorTex.wrapT = THREE.ClampToEdgeWrapping;
+    add(new THREE.PlaneGeometry(WL, WW).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.6 }), 0, 0.12 - Dp, 0);
+    // water: clear turquoise with drifting caustic sparkle
+    waterTexRef = canvasTex(256, 256, (c, W2, H2) => {
+      c.fillStyle = '#ffffff'; c.fillRect(0, 0, W2, H2);
+      const r = rng(31); c.lineWidth = 2;
+      for (let i = 0; i < 160; i++) { c.strokeStyle = 'rgba(160,230,245,' + (0.25 + r() * 0.4) + ')'; c.beginPath(); const x = r() * W2, yy = r() * H2; c.moveTo(x, yy); c.bezierCurveTo(x + 12, yy - 8, x + 22, yy + 8, x + 36, yy); c.stroke(); }
+    });
+    waterTexRef.repeat.set(5, 4);
+    add(new THREE.PlaneGeometry(WL, WW).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: C('#13c3e0'), map: waterTexRef, roughness: 0.05, metalness: 0.1, emissive: C('#05414d'), transparent: true, opacity: 0.72, depthWrite: false }), 0, 0.05, 0);
     const coping = new THREE.MeshStandardMaterial({ color: C('#f4f2ec'), roughness: 0.6 });
-    for (const [w, d, x, z] of [[WL + 0.8, 0.4, 0, WW / 2 + 0.2], [WL + 0.8, 0.4, 0, -WW / 2 - 0.2], [0.4, WW, WL / 2 + 0.2, 0], [0.4, WW, -WL / 2 - 0.2, 0]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), coping); m.position.set(x, 0.16, z); m.receiveShadow = true; g.add(m); }
-    // starting blocks along the deep end
-    for (let i = 0; i < 8; i++) { const sb = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.6), coping); sb.position.set(WL / 2 + 0.6, 0.45, -WW / 2 + (i + 0.5) * WW / 8); sb.castShadow = true; g.add(sb); }
-    // lane-rope floats
-    const floatMat = new THREE.MeshStandardMaterial({ color: C('#e9473b'), roughness: 0.5 });
-    for (let i = 1; i < 8; i++) { const lr = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, WL, 6), floatMat); lr.rotation.z = Math.PI / 2; lr.position.set(0, 0.13, -WW / 2 + i * WW / 8); g.add(lr); }
-    const [bx, bz] = toWorld(POOL, 0, -(DW / 2 - 2.5));
-    building({ x: bx, z: bz, w: 30, d: 5, h: 3, rot: POOL.rot, wall: 'wood', ends: 'stone', roof: 'shed', rise: 0.2 });
-    box(POOL.x, POOL.z, WL / 2 + 0.3, WW / 2 + 0.3, POOL.rot);
+    for (const [w, d, x, z] of [[WL + 0.8, 0.4, 0, WW / 2 + 0.2], [WL + 0.8, 0.4, 0, -WW / 2 - 0.2], [0.4, WW, WL / 2 + 0.2, 0], [0.4, WW, -WL / 2 - 0.2, 0]]) add(new THREE.BoxGeometry(w, 0.12, d), coping, x, 0.16, z);
+    // lane ropes: pink floats with black ends
+    const pink = new THREE.MeshStandardMaterial({ color: C('#e5417a'), roughness: 0.5 }), black = new THREE.MeshStandardMaterial({ color: C('#1c1c20'), roughness: 0.5 });
+    for (let i = 1; i < 9; i++) {
+      const zc = -WW / 2 + i * 2;
+      const mid = add(new THREE.CylinderGeometry(0.06, 0.06, WL - 6, 8), pink, 0, 0.07, zc); mid.rotation.z = Math.PI / 2;
+      for (const sx of [-1, 1]) { const e = add(new THREE.CylinderGeometry(0.06, 0.06, 3, 8), black, sx * (WL / 2 - 1.5), 0.07, zc); e.rotation.z = Math.PI / 2; }
+    }
+    // starting blocks
+    for (let i = 0; i < 9; i++) {
+      const zc = -WW / 2 + (i + 0.5) * 2;
+      add(new THREE.BoxGeometry(0.7, 0.75, 0.55), coping, WL / 2 + 0.75, 0.5, zc, true).rotation.z = 0.1;
+      add(new THREE.BoxGeometry(0.06, 0.5, 0.06), coping, WL / 2 + 1.05, 1.0, zc - 0.22);
+    }
+    // backstroke pennants 5 m from each wall
+    const flagParts = [], cols = [C('#d9262f'), C('#f4f4f2'), C('#2a56b8')];
+    for (const sx of [-1, 1]) {
+      const fx = sx * (WL / 2 - 5);
+      for (const zz of [-WW / 2 - 1.2, WW / 2 + 1.2]) flagParts.push({ g: new THREE.CylinderGeometry(0.04, 0.04, 2.2, 6).translate(fx, 1.1, zz), c: C('#e9e9e6') });
+      for (let k = 0; k < 26; k++) {
+        const zz = -WW / 2 - 1 + k * (WW + 2) / 26, t = new THREE.BufferGeometry();
+        t.setAttribute('position', new THREE.Float32BufferAttribute([fx, 2.1, zz, fx, 2.1, zz + 0.35, fx, 1.85, zz + 0.17], 3)); t.computeVertexNormals();
+        flagParts.push({ g: t, c: cols[k % 3] });
+      }
+    }
+    const fm = new THREE.Mesh(mergeGeoms(flagParts), new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.7 })); g.add(fm);
+    // white lifeguard tower at a deck corner
+    const tw = new THREE.Group(); tw.position.set(-WL / 2 - 2, 0, WW / 2 + 2.2); g.add(tw);
+    for (const [x, z] of [[-0.45, -0.4], [0.45, -0.4], [-0.45, 0.4], [0.45, 0.4]]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.8, 0.1), coping); l.position.set(x, 0.9, z); l.castShadow = true; tw.add(l); }
+    const seatT = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.1, 1.0), coping); seatT.position.y = 1.8; tw.add(seatT);
+    const backT = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.8, 0.1), coping); backT.position.set(0, 2.25, 0.45); tw.add(backT);
+    { const [wx, wz] = toWorld(POOL, -WL / 2 - 2, WW / 2 + 2.2); colliders.circles.push({ x: wx, z: wz, r: 0.7 }); }
+    // covered seating along the -z side: sky-blue wall with the flag and the Olympic rings, white awning, benches
+    const sky = new THREE.MeshStandardMaterial({ color: C('#a9d7ec'), roughness: 0.8 });
+    const zW = -DW / 2 + 0.3;
+    add(new THREE.BoxGeometry(DL - 2, 3.2, 0.3), sky, 0, 1.6, zW, true);
+    const awn = add(new THREE.BoxGeometry(DL - 2, 0.15, 4.2), new THREE.MeshStandardMaterial({ color: C('#f2f1ec'), roughness: 0.5 }), 0, 3.1, zW + 2.1, true); awn.rotation.x = 0.08;
+    for (let x = -DL / 2 + 2; x <= DL / 2 - 2; x += 5) { add(new THREE.BoxGeometry(0.18, 3, 0.18), coping, x, 1.5, zW + 4.0, true); const [wx, wz] = toWorld(POOL, x, zW + 4.0); colliders.circles.push({ x: wx, z: wz, r: 0.2 }); }
+    const benchM = new THREE.MeshStandardMaterial({ color: C('#d9d6cc'), roughness: 0.7 });
+    for (const zz of [zW + 1.0, zW + 2.2]) add(new THREE.BoxGeometry(DL - 6, 0.45 + (zz - zW) * 0.2, 0.5), benchM, 0, 0.22 + (zz - zW) * 0.1, zz, true);
+    const usTex = canvasTex(190, 100, (c) => { for (let i = 0; i < 13; i++) { c.fillStyle = i % 2 ? '#ffffff' : '#b22234'; c.fillRect(0, i * 100 / 13, 190, 100 / 13 + 1); } c.fillStyle = '#3c3b6e'; c.fillRect(0, 0, 76, 54); c.fillStyle = '#fff'; for (let r = 0; r < 9; r++) for (let k = 0; k < (r % 2 ? 5 : 6); k++) { c.beginPath(); c.arc(6.3 + k * 12.6 + (r % 2 ? 6.3 : 0), 4 + r * 5.8, 1.6, 0, 7); c.fill(); } });
+    add(new THREE.PlaneGeometry(2.2, 1.16), new THREE.MeshStandardMaterial({ map: usTex, roughness: 0.8 }), -9, 2.2, zW + 0.16);
+    const ringTex = canvasTex(256, 128, (c) => { c.fillStyle = '#ffffff'; c.fillRect(0, 0, 256, 128); c.lineWidth = 7; [['#0081c8', 60, 50], ['#000000', 128, 50], ['#ee334e', 196, 50], ['#fcb131', 94, 80], ['#00a651', 162, 80]].forEach(([col, x, yy]) => { c.strokeStyle = col; c.beginPath(); c.arc(x, yy, 30, 0, Math.PI * 2); c.stroke(); }); });
+    add(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshStandardMaterial({ map: ringTex, roughness: 0.8 }), -5.6, 2.2, zW + 0.16);
+    { const [wx, wz] = toWorld(POOL, 0, zW); box(wx, wz, DL / 2 - 1, 0.3, POOL.rot); }
+    // low white wall round the deck (opening on the +x end) and a curved lava-rock retaining wall below
+    const lowWall = new THREE.MeshStandardMaterial({ color: C('#eef3f4'), roughness: 0.7 });
+    const wallSeg = (x, z, w, d) => { add(new THREE.BoxGeometry(w, 1.1, d), lowWall, x, 0.55, z, true); const [wx, wz] = toWorld(POOL, x, z); box(wx, wz, w / 2 + 0.05, d / 2 + 0.05, POOL.rot); };
+    wallSeg(0, DW / 2, DL, 0.25); wallSeg(-DL / 2, 0, 0.25, DW);
+    wallSeg(DL / 2, -DW / 4 - 1.5, 0.25, DW / 2 - 3); wallSeg(DL / 2, DW / 4 + 1.5, 0.25, DW / 2 - 3);
+    const stone = wallMat('stone');
+    for (let k = 0; k <= 14; k++) {
+      const a = -0.9 + k / 14 * 1.8, R0 = DW / 2 + 9, cx = Math.sin(a) * (DL / 2 + 6), cz = DW / 2 + 1.8 + (1 - Math.cos(a)) * 1.5;
+      const sg = add(new THREE.BoxGeometry(3.4, 1.4, 0.6), stone, cx, -0.4, cz, true); sg.rotation.y = -a * 0.25;
+      void R0;
+    }
+    // pump house just outside the deck
+    { const [hx, hz] = toWorld(POOL, DL / 2 + 6, -6); building({ x: hx, z: hz, w: 9, d: 6.5, h: 3.2, rot: POOL.rot, wall: 'white', roof: 'hip', rise: 0.25, roofColor: '#9c9fa3' }); }
   })();
+  const inPool = (x, z) => { const [lx, lz] = toLocal(pool, x, z); return Math.abs(lx) < pool.hw - 0.25 && Math.abs(lz) < pool.hd - 0.25; };
 
   // pool deck and pool east of the main buildings, courtyard deck
   (function pool() {
@@ -1549,6 +1615,52 @@ function createWorld(canvas) {
     scene.add(s); bandSprites.push(s);
   }
 
+  // ---------- a gray cat that wanders the upper lawn ----------
+  // Its route depends only on the clock, so everyone sees it in the same place without sharing anything.
+  const cat = (() => {
+    const fur = new THREE.MeshStandardMaterial({ color: C('#8a8d93'), roughness: 0.9 }), dark = new THREE.MeshStandardMaterial({ color: C('#5f6268'), roughness: 0.9 });
+    const g = new THREE.Group(), body = new THREE.Group(); g.add(body); scene.add(g);
+    const add = (parent, geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; parent.add(m); return m; };
+    add(body, new THREE.SphereGeometry(0.13, 14, 10), fur, 0, 0.24, 0).scale.set(0.9, 0.85, 2.0);
+    const head = new THREE.Group(); head.position.set(0, 0.36, 0.27); body.add(head);
+    add(head, new THREE.SphereGeometry(0.1, 14, 10), fur, 0, 0, 0).scale.set(1.05, 0.95, 0.95);
+    for (const sx of [-1, 1]) {
+      const ear = add(head, new THREE.ConeGeometry(0.035, 0.07, 4), dark, sx * 0.055, 0.09, -0.01); ear.rotation.z = -sx * 0.25;
+      add(head, new THREE.SphereGeometry(0.016, 8, 6), new THREE.MeshStandardMaterial({ color: C('#9fd36a'), emissive: C('#2a3a10'), roughness: 0.3 }), sx * 0.04, 0.02, 0.085);
+    }
+    add(head, new THREE.SphereGeometry(0.012, 6, 4), new THREE.MeshStandardMaterial({ color: C('#d48a95') }), 0, -0.015, 0.098);
+    const legs = [];
+    for (const [x, z] of [[-0.06, 0.15], [0.06, 0.15], [-0.06, -0.15], [0.06, -0.15]]) { const pv = new THREE.Group(); pv.position.set(x, 0.2, z); body.add(pv); add(pv, new THREE.CylinderGeometry(0.022, 0.02, 0.2, 6), fur, 0, -0.1, 0); legs.push(pv); }
+    const tail = new THREE.Group(); tail.position.set(0, 0.3, -0.25); body.add(tail);
+    const tcurve = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.08, -0.12), new THREE.Vector3(0, 0.22, -0.18), new THREE.Vector3(0, 0.32, -0.12)]);
+    add(tail, new THREE.TubeGeometry(tcurve, 12, 0.02, 6), dark, 0, 0, 0);
+    // route on the open lawn around the upper field and in front of Modern Languages
+    const ml = BUILDINGS.find((b) => b.name === 'ml');
+    const pts = [[-42, -24], [-10, -29], [30, -27], [48, -8], [44, 18], [8, 27], [-30, 24], [-50, 4]].map(([lx, lz]) => toWorld(uf, lx, lz));
+    pts.splice(2, 0, toWorld(ml, -4, ml.d / 2 + 9));
+    const legsT = []; let total = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length], d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const pause = 5 + (i * 7) % 9;
+      legsT.push({ a, b, walk: d / 0.75, pause, sit: i % 3 === 1 }); total += d / 0.75 + pause;
+    }
+    return { g, body, head, legs, tail, legsT, total };
+  })();
+  function updateCat(t) {
+    let tt = (Date.now() / 1000) % cat.total, seg = cat.legsT[0];
+    for (const s2 of cat.legsT) { if (tt < s2.walk + s2.pause) { seg = s2; break; } tt -= s2.walk + s2.pause; }
+    const walking = tt < seg.walk, u = walking ? tt / seg.walk : 1;
+    const x = seg.a[0] + (seg.b[0] - seg.a[0]) * u, z = seg.a[1] + (seg.b[1] - seg.a[1]) * u;
+    cat.g.position.set(x, groundH(x, z), z);
+    cat.g.rotation.y = Math.atan2(seg.b[0] - seg.a[0], seg.b[1] - seg.a[1]);
+    const ph = t * 9;
+    cat.legs.forEach((l, i) => { l.rotation.x = walking ? Math.sin(ph + (i === 0 || i === 3 ? 0 : Math.PI)) * 0.5 : 0; });
+    const sitting = !walking && seg.sit;
+    cat.body.rotation.x = sitting ? -0.35 : 0; cat.body.position.y = sitting ? -0.05 : 0;
+    cat.head.rotation.y = walking ? 0 : Math.sin(t * 0.7) * 0.6;
+    cat.tail.rotation.z = Math.sin(t * (walking ? 3 : 1.2)) * 0.35;
+  }
+
   // ---------- time of day ----------
   const TIMES = {
     morning: { label: 'Morning', az: 98, el: 17, sun: '#ffe3c4', sunI: 2.5, sky: '#c4daf2', ground: '#4e5a33', hemiI: 0.8, zenith: '#2f68c6', horizon: '#c9dcee', fog: '#c4d6e6', haze: '#b6cbe0', hazeAmt: 0.32, cloud: '#ffffff', cover: 0.44, rainbow: 0, exposure: 0.95 },
@@ -1606,6 +1718,8 @@ function createWorld(canvas) {
     sun.target.position.set(fx, focus.y, fz);
     sun.position.set(fx + lightDir.x * 400, focus.y + lightDir.y * 400, fz + lightDir.z * 400);
     sky.position.copy(camera.position);
+    updateCat(t);
+    if (waterTexRef) { waterTexRef.offset.x = (t * 0.02) % 1; waterTexRef.offset.y = (t * 0.013) % 1; }
     skyUniforms.uTime.value = t;
     return gust;
   }
@@ -1619,7 +1733,7 @@ function createWorld(canvas) {
   const field = { x: TRACK.x, z: TRACK.z, rot: TRACK.rot, halfL: FIELD_L / 2, halfW: FIELD_W / 2, rIn: R_IN, TL, y: groundH(0, 0) };
   tennis.inside = (x, z) => { const [lx, lz] = toLocal(tennis, x, z); return Math.abs(lx) < tennis.hw - 0.3 && Math.abs(lz) < tennis.hd - 0.3; };
   return { scene, renderer, camera, groundH, colliders, flags, C, spawn, bounds, update, setTime, setQuality, times: TIMES, get timeKey() { return timeKey; },
-    seats, carts, placeCart, cartSeat, field, tennis, toLocal, toWorld };
+    seats, carts, placeCart, cartSeat, field, tennis, pool, inPool, cat: cat.g, toLocal, toWorld };
 }
 
 window.HPA = { createWorld };

@@ -182,7 +182,7 @@ body { font-family: var(--body); overflow: hidden; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
-<script src="world.js?v=10"></script>
+<script src="world.js?v=11"></script>
 <script>
 (() => {
 'use strict';
@@ -293,7 +293,7 @@ function makeAvatar(leiColor, skinIdx, gender) {
 // act: '' walking, 'sit', 'lie', 'hula', 'wave', 'drive', 'ride'. lift: seat height above the ground, or null on the ground
 function animateAvatar(a, speed, dt, act, lift) {
   a.t += dt;
-  const T = { py: 0, px: 0, rx: 0, rz: 0, lL: 0, lR: 0, aLx: 0, aRx: 0, aLz: -0.12, aRz: 0.12, sk: 0 };
+  const T = { py: 0, px: 0, pz: 0, rx: 0, rz: 0, lL: 0, lR: 0, aLx: 0, aRx: 0, aLz: -0.12, aRz: 0.12, sk: 0 };
   if (act === 'sit' || act === 'drive' || act === 'ride') {
     const seated = lift != null;
     T.py = (seated ? lift : 0.1) - 0.68;
@@ -309,6 +309,11 @@ function animateAvatar(a, speed, dt, act, lift) {
     T.px = s * 0.07; T.rz = s * 0.06; T.py = -0.04;
     T.lL = 0.12 + Math.max(0, s) * 0.25; T.lR = 0.12 + Math.max(0, -s) * 0.25;
     T.aLz = -1.3 + w * 0.25; T.aRz = 1.3 + w * 0.25; T.aLx = -0.35 + w * 0.35; T.aRx = -0.35 - w * 0.35;
+  } else if (act === 'swim') {
+    T.rx = Math.PI / 2 - 0.12; T.py = -0.18; T.pz = -0.95; T.aLz = -0.2; T.aRz = 0.2;
+    T.lL = Math.sin(a.t * 11) * 0.3; T.lR = -T.lL;
+  } else if (act === 'tread') {
+    T.py = -1.12; T.lL = Math.sin(a.t * 3) * 0.4; T.lR = -T.lL; T.aLz = -0.9 + Math.sin(a.t * 3) * 0.3; T.aRz = 0.9 - Math.sin(a.t * 3) * 0.3; T.aLx = T.aRx = -0.3;
   } else if (act === 'wave') {
     T.aRz = 2.65 + Math.sin(a.t * 9) * 0.35;
   } else {
@@ -320,10 +325,11 @@ function animateAvatar(a, speed, dt, act, lift) {
   if (performance.now() < a.kickUntil) T.lR = -1.2;
   if (performance.now() < a.swingUntil) { T.aRx = -1.4; T.aRz = 1.0; }
   const k = 1 - Math.exp(-14 * dt), L = (o, key, v) => { o[key] += (v - o[key]) * k; };
-  L(a.p.position, 'y', T.py); L(a.p.position, 'x', T.px); L(a.p.rotation, 'x', T.rx); L(a.p.rotation, 'z', T.rz);
+  L(a.p.position, 'y', T.py); L(a.p.position, 'x', T.px); L(a.p.position, 'z', T.pz); L(a.p.rotation, 'x', T.rx); L(a.p.rotation, 'z', T.rz);
   L(a.legL.rotation, 'x', T.lL); L(a.legR.rotation, 'x', T.lR);
   L(a.armL.rotation, 'x', T.aLx); L(a.armR.rotation, 'x', T.aRx); L(a.armL.rotation, 'z', T.aLz); L(a.armR.rotation, 'z', T.aRz);
   if (a.skirt) L(a.skirt.rotation, 'x', T.sk);
+  if (act === 'swim') { a.armL.rotation.x = -(a.t * 3.6) % (Math.PI * 2); a.armR.rotation.x = a.armL.rotation.x - Math.PI; } // freestyle windmill
 }
 function makeTag() {
   const el = document.createElement('div'); el.className = 'tag';
@@ -549,7 +555,7 @@ function stepTennis(dt) {
   const [, mz] = tLocal(me.x, me.z), dx = me.x - tb.x, dz = me.z - tb.z;
   if (Math.sign(mz) === Math.sign(lz) && Math.hypot(dx, dz) < 1.7 && tb.y < TN.floorY + 2.6 && tb.vx * dx + tb.vz * dz > 0) hitTennis(false);
 }
-function kickOrHit() { if (TN.inside(me.x, me.z)) tennisAction(); else kick(); }
+function kickOrHit() { if (W.inPool(me.x, me.z)) return; if (TN.inside(me.x, me.z)) tennisAction(); else kick(); }
 
 // small hint above the bar for whatever is in reach
 function updateCtx() {
@@ -558,6 +564,7 @@ function updateCtx() {
   else if (entered) {
     if (me.ride) msg = me.ride.s === 0 ? 'W/S drive · A/D steer · R get out' : 'Along for the ride · R get out';
     else if (me.act) msg = me.act === 'sit' && me.seat ? 'Sitting · move to stand up' : 'Move to stop';
+    else if (W.inPool(me.x, me.z)) msg = me.speed > 0.3 ? 'Swimming · Shift to swim faster' : 'Treading water · walk to an edge to climb out';
     else if (TN.inside(me.x, me.z)) msg = tb.live && Math.hypot(tb.x - me.x, tb.z - me.z) < 2.6 ? 'F · hit' : 'F · serve · balls that reach you come back by themselves';
     else if (nearestCart(3.5)) msg = 'R · ride the golf cart';
     else if (Math.hypot(ball.x - me.x, ball.z - me.z) < 1.8) msg = 'F · kick the ball';
@@ -755,7 +762,9 @@ async function connectRoom() {
     $('status').textContent = 'Not set up yet: add your Firebase settings to firebase-config.js.';
     renderPeers(); return;
   }
-  try { room = firebaseRoom(cfg, 'hpa'); } catch (e) { room = null; }
+  // a link ending in #room=name opens a separate room (handy for testing); everyone else shares 'hpa'
+  const roomName = (location.hash.match(/^#room=([a-z0-9-]{1,24})$/) || [])[1] || 'hpa';
+  try { room = firebaseRoom(cfg, roomName); } catch (e) { room = null; }
   if (!room) { roomState = 'off'; $('status').textContent = 'Could not start the live connection. Check firebase-config.js.'; renderPeers(); return; }
   myPeer = room.selfId;
   roomState = 'on';
@@ -1000,7 +1009,7 @@ function frame() {
     const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
     if (ix || iz) {
       if (following) setFollow(null);
-      const L = Math.max(1, Math.hypot(ix, iz)), sp = run ? 6.5 : 3.2;
+      const L = Math.max(1, Math.hypot(ix, iz)), sp = W.inPool(me.x, me.z) ? (run ? 2.6 : 1.6) : (run ? 6.5 : 3.2);
       vx = (fx * iz + rx * ix) / L * sp; vz = (fz * iz + rz * ix) / L * sp;
     } else if (following && remotes.has(following) && !me.act) {
       const p = remotes.get(following);
@@ -1030,7 +1039,9 @@ function frame() {
     if (partner) spawnHearts(tmp.set((partner.x + me.x) / 2, me.av.g.position.y, (partner.z + me.z) / 2).clone(), 6);
   }
   me.av.g.position.set(me.x, groundH(me.x, me.z), me.z); me.av.g.rotation.y = me.ry;
-  animateAvatar(me.av, me.speed, dt, me.act, me.lift);
+  const swimming = !me.ride && W.inPool(me.x, me.z);
+  if (swimming && me.act) standUp();
+  animateAvatar(me.av, me.speed, dt, swimming ? (me.speed > 0.3 ? 'swim' : 'tread') : me.act, me.lift);
   if (partner) reachArm(me.av, me.ry, me.x, me.z, partner.x, partner.z);
   stepBall(dt);
   stepTennis(dt);
@@ -1051,7 +1062,8 @@ function frame() {
       if (r.act === 'sit' && r.seat) lift = seatById.get(r.seat).y - groundH(r.x, r.z);
     }
     r.av.g.position.set(r.x, groundH(r.x, r.z), r.z); r.av.g.rotation.y = r.ry;
-    animateAvatar(r.av, r.speed, dt, r.ride ? (r.ride.s === 0 ? 'drive' : 'ride') : r.act, lift);
+    const rSwim = !r.ride && W.inPool(r.x, r.z);
+    animateAvatar(r.av, r.speed, dt, r.ride ? (r.ride.s === 0 ? 'drive' : 'ride') : rSwim ? (r.speed > 0.3 ? 'swim' : 'tread') : r.act, lift);
     r.av.racket.visible = TN.inside(r.x, r.z);
     if (partner && r === partner) reachArm(r.av, r.ry, r.x, r.z, me.x, me.z);
     if (Math.hypot(r.x - me.x, r.z - me.z) < 1.7 && now > nearHeartT) {
