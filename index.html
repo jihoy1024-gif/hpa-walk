@@ -346,6 +346,14 @@ const skinIdx = (Math.random() * 4) | 0;
 const me = { x: W.spawn.x + (Math.random() - 0.5) * 4, z: W.spawn.z + (Math.random() - 0.5) * 1.5, ry: W.spawn.ry, speed: 0 };
 me.av = makeAvatar(color, skinIdx, gender); me.tag = makeTag();
 let camYaw = W.spawn.camYaw, camPitch = 0.22, camDist = 7;
+// a link ending in #pool or #tennis starts you there, facing in
+(() => {
+  const key = (location.hash || '').slice(1);
+  const at = key === 'pool' ? [W.pool, -W.pool.hw - 1.6] : key === 'tennis' ? [W.tennis, -W.tennis.hw + 3] : null;
+  if (!at) return;
+  const [o, lx] = at, [x, z] = W.toWorld(o, lx, 0), fx = Math.cos(o.rot), fz = -Math.sin(o.rot);
+  me.x = x; me.z = z; me.ry = Math.atan2(fx, fz); camYaw = Math.atan2(-fx, -fz);
+})();
 // first person: look from your own eyes; scroll all the way in to enter, out to leave, or press P
 let firstPerson = false, fpPitch = 0;
 function setFirstPerson(on) {
