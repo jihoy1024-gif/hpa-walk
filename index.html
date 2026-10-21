@@ -77,6 +77,13 @@ body { font-family: var(--body); overflow: hidden; }
 .menu { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(3, auto); gap: 6px; padding: 8px; max-width: calc(100% - 32px); }
 .menu .btn { justify-content: space-between; gap: 10px; }
 .menu kbd { font: inherit; font-size: 11px; color: var(--mute); border: 1px solid var(--glass-line); border-radius: 5px; padding: 0 5px; }
+#wb { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(1040px, calc(100% - 24px)); padding: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 5; }
+#wb[hidden] { display: none; }
+.wbhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.wbtools { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.sw { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.35); background: var(--c); cursor: pointer; padding: 0; }
+.sw[aria-pressed="true"] { border-color: var(--foam); box-shadow: 0 0 0 2px var(--coral); }
+#wbView { width: 100%; height: auto; display: block; background: #fff; border-radius: 8px; touch-action: none; cursor: crosshair; }
 #help { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); font-size: 12px; color: var(--mute); text-shadow: 0 1px 6px rgba(0,0,0,0.6); white-space: nowrap; pointer-events: none; }
 
 #stick { position: absolute; left: calc(24px + env(safe-area-inset-left, 0px)); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); width: 116px; height: 116px; border-radius: 50%; background: rgba(255,255,255,0.10); border: 1px solid var(--glass-line); touch-action: none; }
@@ -128,7 +135,7 @@ body { font-family: var(--body); overflow: hidden; }
     <div id="peers" class="panel" aria-live="polite"></div>
   </header>
 
-  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · P first person · H heart · G hold hands · B carry on your back · N hop on their back · Enter talk</div>
+  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · P first person · H heart · G hold hands · B carry on your back · N hop on their back · E whiteboard · Enter talk</div>
   <div id="ctx" class="panel" role="status" hidden></div>
   <div id="goal" hidden>Goal!</div>
   <div id="moves" class="panel menu" hidden>
@@ -140,6 +147,23 @@ body { font-family: var(--body); overflow: hidden; }
     <button class="btn" type="button" data-m="ride">Golf cart <kbd>R</kbd></button>
     <button class="btn" type="button" data-m="carry">Carry on back <kbd>B</kbd></button>
     <button class="btn" type="button" data-m="hopon">Hop on back <kbd>N</kbd></button>
+    <button class="btn" type="button" data-m="draw">Whiteboard <kbd>E</kbd></button>
+  </div>
+  <div id="wb" class="panel" role="dialog" aria-labelledby="wbTitle" hidden>
+    <div class="wbhead">
+      <span id="wbTitle">Whiteboard</span>
+      <span class="wbtools">
+        <button class="sw" type="button" data-c="0" style="--c:#1e1e22" aria-label="Black pen" aria-pressed="true"></button>
+        <button class="sw" type="button" data-c="1" style="--c:#2153c9" aria-label="Blue pen" aria-pressed="false"></button>
+        <button class="sw" type="button" data-c="2" style="--c:#d23434" aria-label="Red pen" aria-pressed="false"></button>
+        <button class="sw" type="button" data-c="3" style="--c:#1f8a3f" aria-label="Green pen" aria-pressed="false"></button>
+        <button class="btn" type="button" data-w="0" aria-pressed="true">Thin</button>
+        <button class="btn" type="button" data-w="1" aria-pressed="false">Thick</button>
+        <button class="btn" type="button" id="wbClear">Clear mine</button>
+        <button class="btn" type="button" id="wbClose">Done <kbd>E</kbd></button>
+      </span>
+    </div>
+    <canvas id="wbView" width="1024" height="384" aria-label="Whiteboard drawing area"></canvas>
   </div>
   <div id="toast" class="panel" role="status" hidden></div>
   <div id="stick" hidden><div id="knob"></div></div>
@@ -184,7 +208,7 @@ body { font-family: var(--body); overflow: hidden; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
-<script src="world.js?v=15"></script>
+<script src="world.js?v=16"></script>
 <script>
 (() => {
 'use strict';
@@ -589,6 +613,7 @@ function updateCtx() {
     else if (asker) msg = asker[1].pig.r === 'c' ? asker[1].nick + ' wants to carry you · N to hop on' : asker[1].nick + ' wants a piggyback · B to carry them';
     else if (me.ride) msg = me.ride.s === 0 ? 'W/S drive · A/D steer · R get out' : 'Along for the ride · R get out';
     else if (me.act) msg = me.act === 'sit' && me.seat ? 'Sitting · move to stand up' : 'Move to stop';
+    else if (nearestBoard() >= 0) msg = 'E · draw on the whiteboard';
     else if (W.inPool(me.x, me.z)) msg = me.speed > 0.3 ? 'Swimming · Shift to swim faster' : 'Treading water · walk to an edge to climb out';
     else if (TN.inside(me.x, me.z)) msg = tb.live && Math.hypot(tb.x - me.x, tb.z - me.z) < 2.6 ? 'F · hit' : 'F · serve · balls that reach you come back by themselves';
     else if (nearestCart(3.5)) msg = 'R · ride the golf cart';
@@ -605,7 +630,7 @@ movesBtn.onclick = () => { const open = movesMenu.hidden; movesMenu.hidden = !op
 movesMenu.addEventListener('click', (e) => {
   const b = e.target.closest('button[data-m]'); if (!b) return;
   const m = b.dataset.m;
-  if (m === 'kick') kickOrHit(); else if (m === 'ride') toggleRide(); else if (m === 'carry') togglePig('c'); else if (m === 'hopon') togglePig('r'); else setAct(m);
+  if (m === 'kick') kickOrHit(); else if (m === 'ride') toggleRide(); else if (m === 'carry') togglePig('c'); else if (m === 'hopon') togglePig('r'); else if (m === 'draw') toggleBoard(); else setAct(m);
 });
 
 // ---------- remote players ----------
@@ -628,6 +653,8 @@ function upsertRemote(peer) {
   if (gg !== r.av.gender) { const old = r.av; r.av = makeAvatar(r.color, r.skin, gg); r.av.g.position.copy(old.g.position); scene.remove(old.g); }
   r.tag.nm.textContent = r.nick;
   r.hold = typeof pr.hold === 'string' ? pr.hold : null;
+  const wbKey = JSON.stringify(pr.wb || null);
+  if (wbKey !== r.wbKey) { const was = new Set((r.wb || []).map((st) => st.b)); r.wbKey = wbKey; r.wb = parseWb(pr.wb); for (const st of r.wb) was.add(st.b); for (const i of was) renderBoard(i); }
   r.pig = pr.pig && typeof pr.pig.to === 'string' && (pr.pig.r === 'c' || pr.pig.r === 'r') ? { to: pr.pig.to, r: pr.pig.r } : null;
   r.act = ACTS.includes(pr.act) ? pr.act : '';
   r.seat = typeof pr.seat === 'string' && seatById.has(pr.seat) ? pr.seat : null;
@@ -652,6 +679,7 @@ function upsertRemote(peer) {
 function removeRemote(id) {
   const r = remotes.get(id); if (!r) return;
   scene.remove(r.av.g); r.tag.el.remove(); remotes.delete(id);
+  for (const i of new Set((r.wb || []).map((st) => st.b))) renderBoard(i);
   if (following === id) setFollow(null);
   if (myHold === id) setHold(null);
   if (myPig && myPig.to === id) setPig(null);
@@ -744,6 +772,98 @@ function remotePig(r) {
   const o = remotes.get(r.pig.to);
   return o && o.pig && o.pig.to === r.id && o.pig.r !== r.pig.r ? { role: r.pig.r, o } : null;
 }
+// ---------- whiteboards in the classrooms: draw together ----------
+// Each player keeps their own strokes in presence.wb as [board, colour, width, points], the points packed two characters
+// per coordinate. Every board draws everyone's strokes, so two people can draw at once and watch each other live.
+// Strokes belong to whoever drew them and leave with them.
+const WB_COLORS = ['#1e1e22', '#2153c9', '#d23434', '#1f8a3f'], WB_WIDTHS = [4, 11], WB_MAX_PTS = 2400;
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+const myStrokes = [], wbView = $('wbView');
+let wbOpen = -1, wbColor = 0, wbWidth = 0, wbCur = null, wbSentAt = 0, wbDirty = false;
+const packPts = (pts) => { let out = ''; for (const v of pts) { const n = Math.max(0, Math.min(4095, v | 0)); out += B64[n >> 6] + B64[n & 63]; } return out; };
+function unpackPts(str) {
+  const pts = [];
+  for (let i = 0; i + 1 < str.length; i += 2) { const a = B64.indexOf(str[i]), b = B64.indexOf(str[i + 1]); if (a < 0 || b < 0) return null; pts.push(a * 64 + b); }
+  return pts.length % 2 ? null : pts;
+}
+function parseWb(v) {
+  const out = [];
+  if (!Array.isArray(v)) return out;
+  for (const st of v.slice(0, 400)) {
+    if (!Array.isArray(st) || st.length !== 4) continue;
+    const [b, c, w, str] = st;
+    if (!Number.isInteger(b) || b < 0 || b >= W.boards.length || !(c in WB_COLORS) || !(w in WB_WIDTHS) || typeof str !== 'string' || str.length > 12000) continue;
+    const pts = unpackPts(str); if (pts && pts.length >= 2) out.push({ b, c, w, p: pts });
+  }
+  return out;
+}
+function penOn(ctx, st) { ctx.strokeStyle = WB_COLORS[st.c]; ctx.lineWidth = WB_WIDTHS[st.w]; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; }
+function drawStroke(ctx, st) {
+  penOn(ctx, st); ctx.beginPath(); ctx.moveTo(st.p[0], st.p[1]);
+  if (st.p.length === 2) ctx.lineTo(st.p[0] + 0.1, st.p[1]);
+  for (let i = 2; i < st.p.length; i += 2) ctx.lineTo(st.p[i], st.p[i + 1]);
+  ctx.stroke();
+}
+function renderBoard(i) {
+  const bd = W.boards[i]; if (!bd) return;
+  bd.ctx.fillStyle = '#ffffff'; bd.ctx.fillRect(0, 0, bd.canvas.width, bd.canvas.height);
+  for (const r of remotes.values()) for (const st of r.wb || []) if (st.b === i) drawStroke(bd.ctx, st);
+  for (const st of myStrokes) if (st.b === i) drawStroke(bd.ctx, st);
+  bd.tex.needsUpdate = true;
+  if (wbOpen === i) wbView.getContext('2d').drawImage(bd.canvas, 0, 0);
+}
+function sendWb(force) {
+  const now = performance.now();
+  if (!force && now - wbSentAt < 140) { wbDirty = true; return; }
+  wbSentAt = now; wbDirty = false;
+  if (room && entered) room.presence({ wb: myStrokes.map((st) => [st.b, st.c, st.w, packPts(st.p)]) }).catch(() => {});
+}
+function nearestBoard() {
+  let best = -1, bd = 2.8;
+  W.boards.forEach((b, i) => { const dx = me.x - b.x, dz = me.z - b.z, d = Math.hypot(dx, dz); if (d < bd && dx * b.nx + dz * b.nz > 0.2) { bd = d; best = i; } });
+  return best;
+}
+function openBoard(i) {
+  wbOpen = i; $('wbTitle').textContent = 'Whiteboard · ' + W.boards[i].label; $('wb').hidden = false; keys.clear();
+  if (document.pointerLockElement) document.exitPointerLock();
+  renderBoard(i);
+}
+function closeBoard() { if (wbOpen < 0) return; endStroke(); wbOpen = -1; $('wb').hidden = true; }
+function toggleBoard() {
+  if (!entered) return;
+  closeMoves();
+  if (wbOpen >= 0) { closeBoard(); return; }
+  const i = nearestBoard();
+  if (i >= 0) openBoard(i); else flash('Walk up to a whiteboard first');
+}
+const boardXY = (e) => { const r = wbView.getBoundingClientRect(); return [Math.round((e.clientX - r.left) / r.width * wbView.width), Math.round((e.clientY - r.top) / r.height * wbView.height)]; };
+function trimStrokes() { let n = 0; for (const st of myStrokes) n += st.p.length / 2; while (n > WB_MAX_PTS && myStrokes.length > 1) n -= myStrokes.shift().p.length / 2; }
+function endStroke() { if (!wbCur) return; wbCur = null; trimStrokes(); sendWb(true); }
+wbView.addEventListener('pointerdown', (e) => {
+  if (wbOpen < 0) return;
+  wbView.setPointerCapture(e.pointerId);
+  const [x, y] = boardXY(e);
+  wbCur = { b: wbOpen, c: wbColor, w: wbWidth, p: [x, y] }; myStrokes.push(wbCur); trimStrokes();
+  renderBoard(wbOpen); sendWb();
+});
+wbView.addEventListener('pointermove', (e) => {
+  if (!wbCur) return;
+  const [x, y] = boardXY(e), pts = wbCur.p, px = pts[pts.length - 2], py = pts[pts.length - 1];
+  if (Math.hypot(x - px, y - py) < 3) return;
+  pts.push(x, y);
+  // add just this segment to the board and to the view, the full redraw waits for other people's changes
+  const bd = W.boards[wbCur.b];
+  for (const ctx of [bd.ctx, wbView.getContext('2d')]) { penOn(ctx, wbCur); ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(x, y); ctx.stroke(); }
+  bd.tex.needsUpdate = true;
+  sendWb();
+});
+wbView.addEventListener('pointerup', endStroke);
+wbView.addEventListener('pointercancel', endStroke);
+document.querySelectorAll('#wb .sw').forEach((b) => b.addEventListener('click', () => { wbColor = +b.dataset.c; document.querySelectorAll('#wb .sw').forEach((o) => o.setAttribute('aria-pressed', String(o === b))); }));
+document.querySelectorAll('#wb [data-w]').forEach((b) => b.addEventListener('click', () => { wbWidth = +b.dataset.w; document.querySelectorAll('#wb [data-w]').forEach((o) => o.setAttribute('aria-pressed', String(o === b))); }));
+$('wbClear').onclick = () => { if (wbOpen < 0) return; for (let i = myStrokes.length - 1; i >= 0; i--) if (myStrokes[i].b === wbOpen) myStrokes.splice(i, 1); renderBoard(wbOpen); sendWb(true); };
+$('wbClose').onclick = closeBoard;
+
 // raise the arm on the partner's side so the hands meet
 function reachArm(av, ry, fromX, fromZ, toX, toZ) {
   const dx = toX - fromX, dz = toZ - fromZ;
@@ -946,6 +1066,8 @@ const keys = new Set();
 const typing = () => document.activeElement && (document.activeElement.tagName === 'INPUT');
 addEventListener('keydown', (e) => {
   if (typing()) return;
+  if (wbOpen >= 0) { if (e.code === 'KeyE' || e.code === 'Escape') { e.preventDefault(); closeBoard(); } return; }
+  if (e.code === 'KeyE' && entered && !e.repeat) { toggleBoard(); return; }
   if (e.key === 'Enter' && entered) { e.preventDefault(); $('say').focus(); return; }
   if (e.code === 'KeyH' && entered) { sendHeart(); return; }
   if (e.code === 'KeyG' && entered) { if (myPig) setPig(null); toggleHold(); return; }
@@ -1119,6 +1241,7 @@ function frame() {
   stepTennis(dt);
   me.av.racket.visible = TN.inside(me.x, me.z);
   sendPresence(false);
+  if (wbDirty) sendWb();
   if (now > holdUiT) { holdUiT = now + 150; updateHoldUi(); updateCtx(); }
 
   const k = 1 - Math.exp(-9 * dt);

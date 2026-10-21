@@ -215,7 +215,7 @@ function createWorld(canvas) {
 
   // floors, stairs and ramps the terrain alone can't make: inside the rectangle the height runs from h0 at local
   // z = -hd to h1 at +hd; the ground mesh drops out of sight under them
-  const ramps = [], sinks = [], noVeg = [], rooms = [];
+  const ramps = [], sinks = [], noVeg = [], rooms = [], boards = [], fans = [];
   const inRect = (r, x, z, pad) => { const [lx, lz] = toLocal(r, x, z), p = pad || 0; return Math.abs(lx) < r.hw + p && Math.abs(lz) < r.hd + p; };
   function addRamp(x, z, rot, hw, hd, h0, h1) {
     ramps.push({ x, z, rot, hw, hd, h0, h1: h1 === undefined ? h0 : h1, rad: Math.hypot(hw, hd) + 0.5 });
@@ -987,6 +987,101 @@ function createWorld(canvas) {
     }
     return mergeGeoms(p);
   }
+  // ---------- a classroom behind the middle door of each 1963 classroom building ----------
+  // From a school photo: cream walls, a white ceiling with light panels and a fan, wood-framed windows with hopper transoms
+  // on the uphill side, a pinboard of student drawings under a yellow clock, a bookshelf, tablet-arm desks in a ring,
+  // grey-green carpet, and a whiteboard that everyone in the room can draw on together.
+  let classIn = null;
+  function classInMat() {
+    if (!classIn) classIn = new THREE.MeshStandardMaterial({ map: canvasTex(256, 128, (c, W2, H2) => { c.fillStyle = '#efe7d3'; c.fillRect(0, 0, W2, H2); c.fillStyle = 'rgba(150,130,100,0.12)'; c.fillRect(0, H2 - 10, W2, 10); }), roughness: 0.9 });
+    return classIn;
+  }
+  function classroom(b, g, body, y0, fl, hF, hd, deckDepth) {
+    const floor = 0; // heights below are measured from the room floor (the body group already sits at it)
+    const RW = 5.2, inn = classInMat(), M = (c, r, ex) => new THREE.MeshStandardMaterial(Object.assign({ color: C(c), roughness: r }, ex || {}));
+    const add = (geo, mat, x, y, z, ry) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); if (ry) m.rotation.y = ry; m.receiveShadow = true; body.add(m); return m; };
+    // walls: partitions either side, the back wall and the ends closed off for walking
+    wallLine(b, body, 'z', -hd, hd, -RW, -1, 0, hF, 0.2, inn, inn, []);
+    wallLine(b, body, 'z', -hd, hd, RW, 1, 0, hF, 0.2, inn, inn, []);
+    { const [x, z] = toWorld(b, 0, -hd); box(x, z, b.w / 2, 0.2, b.rot); }
+    for (const sx of [-1, 1]) { const [x, z] = toWorld(b, sx * b.w / 2, 0); box(x, z, 0.2, hd, b.rot); }
+    { const [x, z] = toWorld(b, 0, hd + deckDepth - 0.1); box(x, z, b.w / 2 + 0.3, 0.08, b.rot); }
+    // windows on the uphill side: wood frames, hopper transoms tipped open, daylight and a grassy bank outside
+    const winTex = canvasTex(512, 160, (c, W2, H2) => {
+      const m = W2 / (2 * RW), Y = (y) => H2 - y * (H2 / hF);
+      c.fillStyle = '#efe7d3'; c.fillRect(0, 0, W2, H2);
+      for (let i = 0; i < 3; i++) {
+        const x0 = (0.5 + i * 3.4) * m, w = 3.0 * m;
+        c.fillStyle = '#8a6a48'; c.fillRect(x0 - 6, Y(3.0), w + 12, Y(0.8) - Y(3.0) + 6);
+        const gr = c.createLinearGradient(0, Y(2.45), 0, Y(0.85)); gr.addColorStop(0, '#f6f8f4'); gr.addColorStop(0.55, '#dfe8d6'); gr.addColorStop(1, '#a9b98f');
+        c.fillStyle = gr; c.fillRect(x0, Y(2.45), w, Y(0.85) - Y(2.45));
+        c.fillStyle = '#d9dfe6'; c.fillRect(x0, Y(2.95), w, Y(2.55) - Y(2.95));
+        c.fillStyle = '#8a6a48'; c.fillRect(x0, Y(2.52), w, 5); c.fillRect(x0 + w / 2 - 3, Y(2.95), 6, Y(0.85) - Y(2.95));
+        c.fillStyle = 'rgba(240,236,224,0.85)'; c.fillRect(x0, Y(2.45), w, (Y(2.2) - Y(2.45)));
+      }
+    });
+    add(new THREE.PlaneGeometry(2 * RW - 0.2, hF), M('#ffffff', 0.8, { map: winTex, emissive: C('#30302c') }), 0, floor + hF / 2, -hd + 0.03);
+    // floor, ceiling with light panels and a dark beam, the fan
+    add(new THREE.PlaneGeometry(2 * RW - 0.2, 2 * hd - 0.2).rotateX(-Math.PI / 2), M('#5b6457', 0.98), 0, floor + 0.02, 0);
+    add(new THREE.PlaneGeometry(2 * RW - 0.2, 2 * hd - 0.2).rotateX(Math.PI / 2), M('#f4f1e8', 0.9, { emissive: C('#57554f') }), 0, floor + hF - 0.04, 0);
+    for (const z of [-hd * 0.45, hd * 0.35]) add(new THREE.PlaneGeometry(1.2, 1.2).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: C('#fbfbf6') }), -1.6, floor + hF - 0.06, z);
+    add(new THREE.BoxGeometry(0.3, 0.3, 2 * hd - 0.2), M('#3b2c22', 0.8), 1.8, floor + hF - 0.2, 0);
+    const fan = new THREE.Group(); fan.position.set(0, floor + hF - 0.05, 0); body.add(fan);
+    const fanM = M('#f2f0ea', 0.6);
+    fan.add(new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.35, 6).translate(0, -0.18, 0), fanM));
+    const hub = new THREE.Group(); hub.position.y = -0.42; fan.add(hub);
+    hub.add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.16, 12), fanM));
+    for (let k = 0; k < 5; k++) { const bl = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.015, 0.14).translate(0.42, 0, 0), fanM); bl.rotation.y = k / 5 * Math.PI * 2; bl.rotation.x = 0.12; hub.add(bl); }
+    fans.push(hub);
+    // pinboard of drawings and a yellow clock on the left partition
+    const pin = canvasTex(512, 192, (c, W2, H2) => {
+      c.fillStyle = '#b8936a'; c.fillRect(0, 0, W2, H2); const r = rng(b.at[0]);
+      const cols = ['#f7f4ea', '#fdf6d8', '#eef3fb', '#fbeef0'], ink = ['#3a6fb5', '#c6493f', '#3d8f4f', '#e3a13a', '#7a4ca0', '#333333'];
+      for (let y = 6; y < H2 - 30; y += 46) for (let x = 6; x < W2 - 30; x += 40) {
+        c.fillStyle = cols[(r() * 4) | 0]; c.fillRect(x, y, 34, 42);
+        for (let k = 0; k < 4; k++) { c.strokeStyle = ink[(r() * ink.length) | 0]; c.lineWidth = 2; c.beginPath(); c.arc(x + 8 + r() * 18, y + 10 + r() * 22, 3 + r() * 6, 0, 6.3); c.stroke(); }
+      }
+    });
+    add(new THREE.PlaneGeometry(2 * hd - 3.2, 1.3), M('#ffffff', 0.9, { map: pin }), -RW + 0.12, floor + 1.55, -0.4, Math.PI / 2);
+    const clock = canvasTex(128, 128, (c) => { c.fillStyle = '#f2c230'; c.beginPath(); c.arc(64, 64, 62, 0, 7); c.fill(); c.fillStyle = '#fffdf2'; c.beginPath(); c.arc(64, 64, 50, 0, 7); c.fill(); c.strokeStyle = '#222'; c.lineWidth = 4; c.beginPath(); c.moveTo(64, 64); c.lineTo(64, 28); c.moveTo(64, 64); c.lineTo(88, 74); c.stroke(); });
+    add(new THREE.CircleGeometry(0.2, 24), M('#ffffff', 0.5, { map: clock, transparent: true }), -RW + 0.12, floor + 2.6, -0.4, Math.PI / 2);
+    // bookshelf in the back corner, against a green palm-leaf panel
+    const parts = [], wood = C('#c9a067'), metal = C('#7f8489'), chairC = C('#454b55');
+    parts.push({ g: new THREE.BoxGeometry(1.0, 2.0, 0.34).translate(RW - 0.75, floor + 1.0, -hd + 0.4), c: C('#7a5636') });
+    for (let k = 0; k < 4; k++) for (let i = 0; i < 8; i++) parts.push({ g: new THREE.BoxGeometry(0.08, 0.26, 0.24).translate(RW - 1.15 + i * 0.1, floor + 0.32 + k * 0.48, -hd + 0.42), c: C(['#b33a3a', '#3a6fb5', '#e3a13a', '#3d8f4f', '#efe7d3'][(i + k) % 5]) });
+    add(new THREE.PlaneGeometry(1.1, 2.3), M('#2f7a45', 0.9), RW - 0.75, floor + 1.15, -hd + 0.2);
+    // tablet-arm desks in a ring, facing the middle, and the teacher's table by the board
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * Math.PI * 2, rr = Math.min(3.4, hd - 1.6), x = Math.cos(a) * rr * 1.15, z = Math.sin(a) * rr, face = Math.atan2(-x, -z);
+      const d = [];
+      d.push({ g: new THREE.CylinderGeometry(0.42, 0.42, 0.04, 20).scale(1.25, 1, 0.8).translate(0, 0.74, 0.15), c: wood });
+      d.push({ g: new THREE.BoxGeometry(0.05, 0.72, 0.05).translate(0.25, 0.37, 0.15), c: metal });
+      d.push({ g: new THREE.BoxGeometry(0.42, 0.05, 0.42).translate(-0.15, 0.45, -0.25), c: chairC });
+      d.push({ g: new THREE.BoxGeometry(0.42, 0.42, 0.05).translate(-0.15, 0.68, -0.47), c: chairC });
+      for (const [lx, lz] of [[-0.33, -0.05], [0.03, -0.05], [-0.33, -0.44], [0.03, -0.44]]) d.push({ g: new THREE.BoxGeometry(0.035, 0.45, 0.035).translate(lx, 0.22, lz), c: metal });
+      for (const q of d) { q.g.rotateY(face); q.g.translate(x, floor, z); parts.push(q); }
+      const [wx, wz] = toWorld(b, x, z); colliders.circles.push({ x: wx, z: wz, r: 0.45 });
+    }
+    parts.push({ g: new THREE.BoxGeometry(0.8, 0.05, 1.6).translate(RW - 1.6, floor + 0.75, 1.8), c: wood });
+    for (const [lx, lz] of [[-0.35, -0.7], [0.35, -0.7], [-0.35, 0.7], [0.35, 0.7]]) parts.push({ g: new THREE.BoxGeometry(0.05, 0.75, 0.05).translate(RW - 1.6 + lx, floor + 0.37, 1.8 + lz), c: metal });
+    { const [wx, wz] = toWorld(b, RW - 1.6, 1.8); box(wx, wz, 0.45, 0.85, b.rot); }
+    const pm = new THREE.Mesh(mergeGeoms(parts), trimMat); pm.castShadow = true; pm.receiveShadow = true; body.add(pm);
+    // the whiteboard on the right partition, facing into the room
+    const W2 = 1024, H2 = 384, cv = document.createElement('canvas'); cv.width = W2; cv.height = H2;
+    const ctx = cv.getContext('2d'); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W2, H2);
+    const tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 4;
+    const BW = 3.6, BH = BW * H2 / W2;
+    add(new THREE.BoxGeometry(0.05, BH + 0.1, BW + 0.1), M('#b9bdc2', 0.4, { metalness: 0.5 }), RW - 0.12, floor + 1.6, 0);
+    add(new THREE.PlaneGeometry(BW, BH), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.35 }), RW - 0.15, floor + 1.6, 0, -Math.PI / 2);
+    add(new THREE.BoxGeometry(0.1, 0.04, BW * 0.9), M('#b9bdc2', 0.4, { metalness: 0.5 }), RW - 0.17, floor + 1.6 - BH / 2 - 0.04, 0);
+    const [bx, bz] = toWorld(b, RW - 0.15, 0), nx = -Math.cos(b.rot), nz = Math.sin(b.rot);
+    boards.push({ x: bx, z: bz, nx, nz, canvas: cv, ctx, tex, label: b.label || 'Classroom' });
+    // floor of the room, the camera stays inside it, nothing grows indoors
+    const [rx, rz] = toWorld(b, 0, 0);
+    addRamp(rx, rz, b.rot, RW - 0.1, hd - 0.1, y0 + fl);
+    rooms.push({ x: rx, z: rz, rot: b.rot, hw: RW - 0.35, hd: hd - 0.35, y0: y0 + fl, top: hF - 0.3 });
+    noVeg.push({ x: b.x, z: b.z, rot: b.rot, hw: b.w / 2 + 0.5, hd: hd + 0.5 });
+  }
   function building(b) {
     const g = new THREE.Group();
     const y0 = groundH(b.x, b.z);
@@ -1031,7 +1126,8 @@ function createWorld(canvas) {
       const foot = new THREE.Mesh(new THREE.BoxGeometry(b.w + 0.3, 3 + floor, b.d + 0.3), footMat); foot.position.y = (floor - 3) / 2; foot.receiveShadow = true; g.add(foot);
     } else if (!b.open) {
       const front = b.cls ? (b.lockers ? 'lanaiL' : 'lanai') : b.wall, back = b.cls ? 'ribbon' : b.wall;
-      const walls = new THREE.Mesh(wallsGeo(b.w, b.d, hF, hB, vSpan, gableRise), [wallMat(front), wallMat(b.ends || b.wall), wallMat('glass'), wallMat(back)]);
+      const walls = new THREE.Mesh(wallsGeo(b.w, b.d, hF, hB, vSpan, gableRise), [b.cls ? new THREE.MeshBasicMaterial({ visible: false }) : wallMat(front), wallMat(b.ends || b.wall), wallMat('glass'), wallMat(back)]);
+      if (b.cls) wallLine(b, body, 'x', -b.w / 2, b.w / 2, hd, 1, 0, hF, 0.2, wallMat(front), classInMat(), [[0, 1.2, 2.35]]);
       walls.castShadow = true; walls.receiveShadow = true; body.add(walls);
       const foot = new THREE.Mesh(new THREE.BoxGeometry(b.w + 0.3, 3 + floor, b.d + 0.3), b.dorm ? wallMat('stone') : b.name === 'chapel' ? wallMat('chapel') : footMat); foot.position.y = (floor - 3) / 2; foot.receiveShadow = true; g.add(foot);
     } else {
@@ -1080,12 +1176,19 @@ function createWorld(canvas) {
       };
       if (b.cls) {
         rail(-b.w / 2 - 0.3, b.w / 2 + 0.3);
-        for (const sx of [-1, 1]) { const L = 3.4, ramp = new THREE.BoxGeometry(L, 0.14, deckDepth - 0.2); ramp.rotateZ(sx * Math.atan2(floor, L)); ramp.translate(sx * (b.w / 2 + 0.3 + L / 2), floor / 2 - 0.05, hd + deckDepth / 2); parts.push({ g: ramp, c: C('#8a8378') }); }
+        const L = 3.4, slope = Math.atan2(floor, L);
+        for (const sx of [-1, 1]) {
+          const ramp = new THREE.BoxGeometry(Math.hypot(L, floor), 0.14, deckDepth - 0.2); ramp.rotateZ(-sx * slope); ramp.translate(sx * (b.w / 2 + 0.3 + L / 2), floor / 2 - 0.07, hd + deckDepth / 2); parts.push({ g: ramp, c: C('#8a8378') });
+          const [rx, rz] = toWorld(b, sx * (b.w / 2 + 0.3 + L / 2), hd + deckDepth / 2);
+          addRamp(rx, rz, b.rot + Math.PI / 2, (deckDepth - 0.2) / 2, L / 2, sx > 0 ? y0 + floor : y0, sx > 0 ? y0 : y0 + floor);
+        }
+        { const [dx, dz] = toWorld(b, 0, hd + deckDepth / 2); addRamp(dx, dz, b.rot, b.w / 2 + 0.3, deckDepth / 2, y0 + floor); }
       } else rail(-b.w / 2 - 0.3, -1.2), rail(1.2, b.w / 2 + 0.3);
       if (!b.cls) for (let i = 0; i < 3; i++) parts.push({ g: new THREE.BoxGeometry(2.2, floor * (3 - i) / 3, 0.35).translate(0, floor * (3 - i) / 6, hd + deckDepth + 0.17 + i * 0.35), c: C('#5c4635') });
       const m = new THREE.Mesh(mergeGeoms(parts), trimMat); m.castShadow = true; m.receiveShadow = true; g.add(m);
     }
     const ohia = C('#a39a8c');
+    if (b.cls) classroom(b, g, body, y0, floor, hF, hd, deckDepth);
     if (b.cls) {
       // polycarbonate windscreen hanging from the high uphill eave, and a translucent strip in the roof over the lanai
       const poly = new THREE.MeshStandardMaterial({ color: C('#e4ecee'), transparent: true, opacity: 0.55, roughness: 0.3, side: THREE.DoubleSide, depthWrite: false });
@@ -1269,7 +1372,7 @@ function createWorld(canvas) {
     }
     scene.add(g);
     const [cx, cz] = toWorld(b, 0, deckDepth / 2);
-    if (!b.open && !b.walk) box(cx, cz, b.w / 2 + 0.35, b.d / 2 + deckDepth / 2 + 0.35, b.rot);
+    if (!b.open && !b.walk && !b.cls) box(cx, cz, b.w / 2 + 0.35, b.d / 2 + deckDepth / 2 + 0.35, b.rot);
     return g;
   }
   BUILDINGS.forEach(building);
@@ -2504,6 +2607,7 @@ function createWorld(canvas) {
     sun.position.set(fx + lightDir.x * 400, focus.y + lightDir.y * 400, fz + lightDir.z * 400);
     sky.position.copy(camera.position);
     updateCat(t);
+    for (const f of fans) f.rotation.y = t * 2.6;
     if (waterTexRef) { waterTexRef.offset.x = (t * 0.02) % 1; waterTexRef.offset.y = (t * 0.013) % 1; }
     skyUniforms.uTime.value = t;
     return gust;
@@ -2520,7 +2624,7 @@ function createWorld(canvas) {
   const field = { x: TRACK.x, z: TRACK.z, rot: TRACK.rot, halfL: FIELD_L / 2, halfW: FIELD_W / 2, rIn: R_IN, TL, y: groundH(0, 0) };
   tennis.inside = (x, z) => { const [lx, lz] = toLocal(tennis, x, z); return Math.abs(lx) < tennis.hw - 0.3 && Math.abs(lz) < tennis.hd - 0.3; };
   return { scene, renderer, camera, groundH, colliders, flags, C, spawn, bounds, update, setTime, setQuality, times: TIMES, get timeKey() { return timeKey; },
-    seats, carts, placeCart, cartSeat, field, tennis, pool, inPool, cat: cat.g, toLocal, toWorld, roomAt };
+    seats, carts, placeCart, cartSeat, field, tennis, pool, inPool, cat: cat.g, toLocal, toWorld, roomAt, boards };
 }
 
 window.HPA = { createWorld };
