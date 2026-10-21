@@ -33,6 +33,8 @@ body { font-family: var(--body); overflow: hidden; }
 .tag .nm { font-size: 13px; padding: 2px 9px; border-radius: 99px; background: rgba(28, 24, 48, 0.55); border: 1px solid var(--glass-line); letter-spacing: 0.02em; }
 .tag .say { max-width: 220px; white-space: normal; text-align: center; font-size: 14px; line-height: 1.35; padding: 6px 11px; border-radius: 14px; background: var(--foam); color: #2a2238; box-shadow: 0 4px 14px rgba(0,0,0,0.25); }
 .tag .say:empty { display: none; }
+.tag .nm.vc::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #7fd9a0; margin-right: 6px; vertical-align: 1px; }
+.tag .nm.talk { box-shadow: 0 0 0 2px #7fd9a0, 0 0 14px rgba(127, 217, 160, 0.8); }
 
 .hud { position: absolute; display: flex; gap: 10px; pointer-events: none; }
 .hud > * { pointer-events: auto; }
@@ -154,7 +156,7 @@ body { font-family: var(--body); overflow: hidden; }
     <div id="peers" class="panel" aria-live="polite"></div>
   </header>
 
-  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · P first person · H heart · G hold hands · B carry on your back · N hop on their back · E whiteboard · K kiss · L race · Enter talk</div>
+  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · P first person · H heart · G hold hands · B carry on your back · N hop on their back · E whiteboard · K kiss · L race · M voice · Enter talk</div>
   <div id="ctx" class="panel" role="status" hidden></div>
   <div id="goal" hidden>Goal!</div>
   <div id="raceBig" hidden></div>
@@ -208,6 +210,7 @@ body { font-family: var(--body); overflow: hidden; }
       <button class="btn" type="button" id="holdBtn" aria-pressed="false" disabled title="Hold hands (G): stand close and both press it"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l4-4 3 1 2-2M21 13l-4-4-3 1-4 4a1.4 1.4 0 0 0 2 2l2-2 2 2M7 9l-2 7M17 9l2 7"/></svg><span class="tx" id="holdTx">Hold hands</span></button>
       <button class="btn" type="button" id="followBtn" aria-pressed="false" disabled title="Walk together: stay at their side"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="5" r="2"/><circle cx="16" cy="5" r="2"/><path d="M8 8v6l-2 7M8 14l2 7M16 8v6l-2 7M16 14l2 7M8 10h8"/></svg><span class="tx">Walk together</span></button>
       <button class="btn" type="button" id="fpBtn" aria-pressed="false" title="First-person view (P)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span class="tx">First person</span></button>
+      <button class="btn" type="button" id="voiceBtn" aria-pressed="false" title="Voice chat (M): people nearby hear you, louder the closer they are"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span class="tx">Voice</span></button>
       <button class="btn" type="button" id="soundBtn" aria-pressed="false" title="Wind and birdsong"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9h11a3 3 0 1 0-3-3M3 13h15a3 3 0 1 1-3 3M3 17h7"/></svg><span class="tx">Wind</span></button>
     </form>
   </div>
@@ -752,6 +755,7 @@ function updateCtx() {
   if (el.textContent !== msg) el.textContent = msg;
   el.hidden = !msg || !!film;
   updateFilmUi();
+  voiceTick();
 }
 const movesMenu = $('moves'), movesBtn = $('movesBtn');
 function closeMoves() { movesMenu.hidden = true; movesBtn.setAttribute('aria-expanded', 'false'); }
@@ -791,6 +795,8 @@ function upsertRemote(peer) {
       if (pr.kiss.to === myPeer) { flash(r.nick + ' kissed you'); spawnHearts(tmp.set((r.x + me.x) / 2, me.av.g.position.y + 1.5, (r.z + me.z) / 2).clone(), 8); }
     }
   }
+  r.vc = pr.vc === 1;
+  { const sg = pr.rtc && myPeer ? pr.rtc[myPeer] : null; r.sig = sg && (sg.k === 'o' || sg.k === 'a') && typeof sg.n === 'string' && typeof sg.sdp === 'string' && sg.sdp.length < 20000 ? sg : null; }
   r.film = pr.film && Number.isFinite(pr.film.go) && (pr.film.tb === 0 || pr.film.tb === 1) ? { go: pr.film.go, tb: pr.film.tb } : null;
   r.race = pr.race && Number.isFinite(pr.race.go) ? { go: pr.race.go, fin: Number.isFinite(pr.race.fin) ? pr.race.fin : 0 } : null;
   r.pig = pr.pig && typeof pr.pig.to === 'string' && (pr.pig.r === 'c' || pr.pig.r === 'r') ? { to: pr.pig.to, r: pr.pig.r } : null;
@@ -1020,6 +1026,129 @@ function kiss() {
   const r = remotes.get(id), both = r && r.kissTo === myPeer && performance.now() < (r.kissUntil || 0);
   spawnHearts(tmp.set((r.x + me.x) / 2, me.av.g.position.y + 1.5, (r.z + me.z) / 2).clone(), both ? 14 : 7);
 }
+// ---------- voice chat: talk to people nearby, louder the closer they are ----------
+// Microphones connect straight between browsers (WebRTC). The offer and the answer travel through the room as a
+// short-lived `rtc` entry on the sender's own peer record, addressed by peer id (room.signal), and are cleared once
+// the call is up. Each voice plays through Web Audio: its gain falls off with the distance between you on campus and
+// it pans toward where they stand. The artifact's live room has no signal channel (presence is capped at 4 KiB),
+// so voice runs on the GitHub Pages build.
+const VC_NEAR = 2.5, VC_FAR = 35, RTC_CFG = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] }] };
+let vcStream = null, vcCtx = null, vcOut = null, vcEl = null, vcMic = null, vcBusy = false;
+const calls = new Map(), vcHandled = new Map(), vcRetry = new Map(); // peer id -> call, last offer answered, earliest retry
+const voiceGain = (d) => (d <= VC_NEAR ? 1 : d >= VC_FAR ? 0 : Math.pow(1 - (d - VC_NEAR) / (VC_FAR - VC_NEAR), 2));
+const level = (an, buf) => { an.getByteTimeDomainData(buf); let s = 0; for (const v of buf) { const x = (v - 128) / 128; s += x * x; } return Math.sqrt(s / buf.length); };
+async function toggleVoice() {
+  if (!entered || vcBusy) return;
+  if (vcStream) { stopVoice(); flash('Voice off'); return; }
+  if (!room || !room.signal) { flash('Voice chat works on the GitHub Pages link: jihoy1024-gif.github.io/hpa-walk'); return; }
+  if (!navigator.mediaDevices || !window.RTCPeerConnection) { flash('This browser cannot do voice chat'); return; }
+  vcBusy = true;
+  try { startVoice(await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } })); flash('Voice on · people near you hear you, louder the closer they are · headphones help'); }
+  catch (e) { flash('No microphone: allow it in the browser to talk'); }
+  vcBusy = false;
+}
+function startVoice(stream) {
+  vcStream = stream;
+  vcCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // voices leave through an <audio> element so the browser's echo cancelling can hear what the speakers play
+  vcOut = vcCtx.createMediaStreamDestination();
+  vcEl = new Audio(); vcEl.srcObject = vcOut.stream; vcEl.play().catch(() => {});
+  const an = vcCtx.createAnalyser(); an.fftSize = 256; vcCtx.createMediaStreamSource(stream).connect(an);
+  vcMic = { an, buf: new Uint8Array(an.fftSize) };
+  $('voiceBtn').setAttribute('aria-pressed', 'true');
+  if (room) room.presence({ vc: 1 }).catch(() => {});
+}
+function stopVoice() {
+  for (const id of [...calls.keys()]) closeCall(id);
+  if (room && room.signal) room.signal(null, null);
+  if (vcStream) vcStream.getTracks().forEach((tr) => tr.stop());
+  if (vcEl) { vcEl.pause(); vcEl.srcObject = null; }
+  if (vcCtx) vcCtx.close().catch(() => {});
+  vcStream = vcCtx = vcOut = vcEl = vcMic = null;
+  me.tag.nm.classList.remove('vc', 'talk');
+  $('voiceBtn').setAttribute('aria-pressed', 'false');
+  if (room) room.presence({ vc: null }).catch(() => {});
+}
+function newCall(id, nonce, role) {
+  const pc = new RTCPeerConnection(RTC_CFG), c = { pc, id, nonce, role, t0: performance.now(), up: false };
+  vcStream.getTracks().forEach((tr) => pc.addTrack(tr, vcStream));
+  pc.ontrack = (e) => attachVoice(c, e.streams[0] || new MediaStream([e.track]));
+  pc.onconnectionstatechange = () => {
+    if (calls.get(id) !== c) return;
+    if (pc.connectionState === 'connected' && !c.up) { c.up = true; room.signal(id, null); }
+    else if (pc.connectionState === 'failed') { closeCall(id); vcRetry.set(id, performance.now() + 4000); }
+  };
+  calls.set(id, c);
+  return c;
+}
+const iceDone = (pc) => new Promise((ok) => {
+  if (pc.iceGatheringState === 'complete') return ok();
+  const t = setTimeout(ok, 2500);
+  pc.addEventListener('icegatheringstatechange', () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); ok(); } });
+});
+async function callPeer(id) {
+  const c = newCall(id, Math.random().toString(36).slice(2, 10), 'o');
+  try {
+    await c.pc.setLocalDescription(await c.pc.createOffer());
+    await iceDone(c.pc);
+    if (calls.get(id) === c) room.signal(id, { k: 'o', n: c.nonce, sdp: c.pc.localDescription.sdp });
+  } catch (e) { closeCall(id); vcRetry.set(id, performance.now() + 4000); }
+}
+async function answerPeer(id, sig) {
+  closeCall(id);
+  const c = newCall(id, sig.n, 'a');
+  try {
+    await c.pc.setRemoteDescription({ type: 'offer', sdp: sig.sdp });
+    await c.pc.setLocalDescription(await c.pc.createAnswer());
+    await iceDone(c.pc);
+    if (calls.get(id) === c) room.signal(id, { k: 'a', n: sig.n, sdp: c.pc.localDescription.sdp });
+  } catch (e) { closeCall(id); }
+}
+function attachVoice(c, stream) {
+  if (c.src || !vcCtx) return;
+  // Chrome only feeds a remote stream into Web Audio while a media element is playing it
+  c.el = new Audio(); c.el.muted = true; c.el.srcObject = stream; c.el.play().catch(() => {});
+  c.src = vcCtx.createMediaStreamSource(stream); c.gain = vcCtx.createGain(); c.pan = vcCtx.createStereoPanner(); c.an = vcCtx.createAnalyser();
+  c.gain.gain.value = 0; c.an.fftSize = 256; c.buf = new Uint8Array(c.an.fftSize);
+  c.src.connect(c.an); c.src.connect(c.gain); c.gain.connect(c.pan); c.pan.connect(vcOut);
+}
+function closeCall(id) {
+  const c = calls.get(id); if (!c) return;
+  calls.delete(id);
+  try { c.pc.close(); } catch (e) {}
+  if (c.src) { c.src.disconnect(); c.gain.disconnect(); c.pan.disconnect(); }
+  if (c.el) { c.el.pause(); c.el.srcObject = null; }
+  if (room && room.signal) room.signal(id, null);
+  const r = remotes.get(id); if (r) r.tag.nm.classList.remove('talk');
+}
+// a few times a second: start, answer and drop calls, set each voice's loudness and side, light up who is talking
+function voiceTick() {
+  for (const r of remotes.values()) r.tag.nm.classList.toggle('vc', !!r.vc);
+  if (!vcStream) return;
+  const now = performance.now();
+  me.tag.nm.classList.add('vc');
+  me.tag.nm.classList.toggle('talk', level(vcMic.an, vcMic.buf) > 0.035);
+  for (const id of [...calls.keys()]) { const r = remotes.get(id); if (!r || !r.vc) closeCall(id); }
+  const rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+  for (const r of remotes.values()) {
+    if (!r.vc) continue;
+    let c = calls.get(r.id);
+    const sig = r.sig;
+    if (sig && sig.k === 'o' && vcHandled.get(r.id) !== sig.n) { vcHandled.set(r.id, sig.n); answerPeer(r.id, sig); continue; }
+    if (sig && sig.k === 'a' && c && c.role === 'o' && c.nonce === sig.n && !c.answered) { c.answered = true; c.pc.setRemoteDescription({ type: 'answer', sdp: sig.sdp }).catch(() => {}); }
+    // the lower peer id rings; a call that never comes up is dropped and rung again
+    if (c && !c.up && now - c.t0 > 15000) { closeCall(r.id); vcRetry.set(r.id, now + 2000); c = null; }
+    if (!c && myPeer && myPeer < r.id && now > (vcRetry.get(r.id) || 0)) { callPeer(r.id); continue; }
+    if (c && c.gain) {
+      const dx = r.x - me.x, dz = r.z - me.z, d = Math.hypot(dx, dz);
+      c.gain.gain.setTargetAtTime(voiceGain(d), vcCtx.currentTime, 0.12);
+      c.pan.pan.setTargetAtTime(d > 0.5 ? Math.max(-1, Math.min(1, (dx * rx + dz * rz) / d)) * 0.75 : 0, vcCtx.currentTime, 0.12);
+      r.tag.nm.classList.toggle('talk', level(c.an, c.buf) > 0.035 && voiceGain(d) > 0.02);
+    }
+  }
+}
+$('voiceBtn').onclick = () => toggleVoice();
+
 // ---------- the night they started dating: an easter egg at the nook ----------
 // After dark, when two people sit at the same grey picnic table in the nook beside the Student Store, a "Watch
 // animation" button appears. It plays for everyone at that table at once (presence.film = { go: epoch ms, tb: table }):
@@ -1442,21 +1571,27 @@ function renderPeers() {
   $('followBtn').disabled = remotes.size === 0;
 }
 // ---------- live room on Firebase Realtime Database ----------
-// Same shape as the page expects: presence(patch) and onPeers(handler).
+// Same shape as the page expects: presence(patch) and onPeers(handler), plus signal(to, data) for voice chat:
+// a short-lived rtc/<to> entry on our own peer record (the database rules only let us write there).
 function firebaseRoom(cfg, roomName) {
   firebase.initializeApp(cfg);
   const db = firebase.database();
   const id = 'p' + Math.random().toString(36).slice(2, 12);
   const base = db.ref('rooms/' + roomName + '/peers');
   const mine = base.child(id);
-  mine.onDisconnect().remove();
   addEventListener('pagehide', () => { mine.remove(); });
-  let state = {}, timer = null;
+  // the first write (and the first after a reconnect) sets the whole record; after that only changed fields go up,
+  // so the rtc entries survive and a step doesn't resend everything
+  let state = {}, dirty = {}, timer = null, whole = true;
   const flush = () => {
     timer = null;
     if (typeof state.x !== 'number') return;
-    mine.set(Object.assign({}, state, { ts: firebase.database.ServerValue.TIMESTAMP })).catch(() => {});
+    const ts = firebase.database.ServerValue.TIMESTAMP;
+    if (whole) { whole = false; dirty = {}; mine.set(Object.assign({}, state, { ts })).catch(() => { whole = true; }); return; }
+    const up = Object.assign({}, dirty, { ts }); dirty = {};
+    mine.update(up).catch(() => { whole = true; });
   };
+  db.ref('.info/connected').on('value', (s) => { if (s.val()) { mine.onDisconnect().remove(); whole = true; if (!timer) timer = setTimeout(flush, 80); } });
   const peersMap = new Map();
   let left = [], handlers = [], pending = false;
   const deliver = () => {
@@ -1472,11 +1607,16 @@ function firebaseRoom(cfg, roomName) {
   return {
     selfId: id,
     presence(patch) {
-      for (const k in patch) { if (patch[k] === null) delete state[k]; else state[k] = patch[k]; }
+      for (const k in patch) { if (patch[k] === null) delete state[k]; else state[k] = patch[k]; dirty[k] = patch[k]; }
       if (!timer) timer = setTimeout(flush, 80);
       return Promise.resolve();
     },
     onPeers(h) { handlers.push(h); queue(); return () => { handlers = handlers.filter((x) => x !== h); }; },
+    signal(to, data) {
+      if (whole) return Promise.resolve();
+      const ref = to ? mine.child('rtc').child(to) : mine.child('rtc');
+      return (data ? ref.set(data) : ref.remove()).catch(() => {});
+    },
   };
 }
 async function connectRoom() {
@@ -1624,6 +1764,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyE' && entered && !e.repeat) { toggleBoard(); return; }
   if (e.code === 'KeyK' && entered && !e.repeat) { kiss(); return; }
   if (e.code === 'KeyL' && entered && !e.repeat) { startRace(); return; }
+  if (e.code === 'KeyM' && entered && !e.repeat) { toggleVoice(); return; }
   if (e.key === 'Enter' && entered) { e.preventDefault(); $('say').focus(); return; }
   if (e.code === 'KeyH' && entered) { sendHeart(); return; }
   if (e.code === 'KeyG' && entered) { if (myPig) setPig(null); toggleHold(); return; }
