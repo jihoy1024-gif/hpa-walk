@@ -290,8 +290,13 @@ function createWorld(canvas) {
   const railC = (x0, z0, x1, z1) => box((x0 + x1) / 2, (z0 + z1) / 2, Math.max(Math.abs(x1 - x0) / 2, 0.12), Math.max(Math.abs(z1 - z0) / 2, 0.12), 0);
   // union: store porch on the lawn, exterior stair on the east side down from the square
   addRamp(197.9, -65.7, 0, 11.5, 1.7, Y_LOW + 0.12);
-  addRamp(212.3, -74.25, 0, 2.3, 5.75, PLATEAU_Y, Y_LOW);
-  railC(209.9, -80, 209.9, -68.5); railC(214.8, -80, 214.8, -68.5);
+  addRamp(214.1, -74.25, 0, 1.1, 5.75, PLATEAU_Y, Y_LOW);
+  railC(212.9, -80, 212.9, -70.6); railC(215.3, -80, 215.3, -68.5);
+  // a paved nook at store level between the store's east wall and the stair, with two grey picnic tables
+  const NOOK = { x: 211.2, z: -73.7, hw: 1.6, hd: 6.3, tables: [[211.2, -76.0], [211.2, -71.6]] };
+  addRamp(NOOK.x, NOOK.z, 0, NOOK.hw, NOOK.hd, Y_LOW + 0.06);
+  railC(209.6, -80.1, 212.9, -80.1);
+  noVeg.push({ x: 212.4, z: -74, rot: 0, hw: 3.2, hd: 7 });
   // dining hall: deck over the lawn on its downhill side, with a stair down at the east end
   addRamp(232.5, -71.7, 0, 17.2, 1.5, PLATEAU_Y);
   const DSTAIR = (() => { const g0 = groundH(243.75, -63.5), L = Math.max(3, (PLATEAU_Y - g0) / 0.6); return { x: 243.75, z0: -70.2, L, g0 }; })();
@@ -915,10 +920,10 @@ function createWorld(canvas) {
     return geo;
   }
   // a straight wall in a building's frame, along local x (at z = at) or local z (at x = at); out = which side faces outdoors;
-  // openings = [[centre, width, height], ...] along the wall
+  // openings = [[centre, width, top, sill], ...] along the wall; a sill turns a doorway into a window
   function wallLine(o, parent, along, c0, c1, at, out, y0, h, t, matOut, matIn, openings, vS) {
     const pieces = []; let s0 = c0;
-    for (const [c, w, oh] of (openings || []).slice().sort((p, q) => p[0] - q[0])) { const a = c - w / 2, b = c + w / 2; if (a > s0) pieces.push([s0, a, 0, h]); pieces.push([a, b, oh, h]); s0 = b; }
+    for (const [c, w, oh, sill] of (openings || []).slice().sort((p, q) => p[0] - q[0])) { const a = c - w / 2, b = c + w / 2; if (a > s0) pieces.push([s0, a, 0, h]); if (sill) pieces.push([a, b, 0, sill]); pieces.push([a, b, oh, h]); s0 = b; }
     if (c1 > s0) pieces.push([s0, c1, 0, h]);
     for (const [a, b, yb, yt] of pieces) {
       if (yt - yb < 0.02 || b - a < 0.02) continue;
@@ -969,6 +974,17 @@ function createWorld(canvas) {
     p.push({ g: new THREE.BoxGeometry(1.85, 0.05, 0.78).translate(0, 0.74, 0), c: red });
     for (const sz of [-0.66, 0.66]) p.push({ g: new THREE.BoxGeometry(1.85, 0.05, 0.3).translate(0, 0.45, sz), c: red });
     for (const sx of [-0.72, 0.72]) { p.push({ g: new THREE.BoxGeometry(0.05, 0.05, 1.6).translate(sx, 0.42, 0), c: blk }); p.push({ g: new THREE.BoxGeometry(0.05, 0.74, 0.05).rotateX(0.32).translate(sx, 0.37, -0.12), c: blk }); p.push({ g: new THREE.BoxGeometry(0.05, 0.74, 0.05).rotateX(-0.32).translate(sx, 0.37, 0.12), c: blk }); }
+    return mergeGeoms(p);
+  }
+  // grey picnic table with its long benches built into the frame (the nook beside the Student Store)
+  function greyPicnicGeo() {
+    const p = [], top = C('#8e9195'), frame = C('#5d6065');
+    p.push({ g: new THREE.BoxGeometry(2.2, 0.06, 0.82).translate(0, 0.76, 0), c: top });
+    for (const sz of [-0.68, 0.68]) p.push({ g: new THREE.BoxGeometry(2.2, 0.06, 0.3).translate(0, 0.46, sz), c: top });
+    for (const sx of [-0.78, 0.78]) {
+      p.push({ g: new THREE.BoxGeometry(0.06, 0.06, 1.7).translate(sx, 0.42, 0), c: frame });
+      for (const sd of [-1, 1]) p.push(beamPart(sx, 0.73, sd * 0.12, sx, 0.0, sd * 0.62, 0.06, 0.06, frame));
+    }
     return mergeGeoms(p);
   }
   function building(b) {
@@ -1144,7 +1160,7 @@ function createWorld(canvas) {
       // Davies Chapel (HABS HI-601-A and the school's photos): stained dark board walls on a band of board-formed concrete
       // set with lava rock. Along the south front a long low pent roof shelters a screen of natural ʻōhiʻa poles before the
       // coloured window; the tall entry door stands between big ʻōhiʻa posts; wood jalousies run under the eaves; the west
-      // gable carries a white cross over a wall of multi-light glass. The timber bell frame is gone.
+      // gable carries a white cross over a wall of multi-light glass. An open timber bell tower stands on the roof above the entry.
       const hw = b.w / 2, parts = [], beamC = C('#5b4433'), poleC = C('#b3ab9c'), r = rng(31);
       const band = new THREE.Mesh(uvBox(new THREE.BoxGeometry(b.w + 0.2, 1.1, b.d + 0.2), [b.w + 0.2, 1.1, b.d + 0.2], 8, 4), wallMat('chapel'));
       band.position.y = floor + 0.4; band.castShadow = true; band.receiveShadow = true; g.add(band);
@@ -1171,6 +1187,20 @@ function createWorld(canvas) {
       for (let x = -hw + 1; x <= hw - 0.8; x += 2.8) for (const sz of [-1, 1]) parts.push({ g: new THREE.BoxGeometry(0.3, 0.45, eave + 0.2).translate(x, floor + hF - 0.25, sz * (hd + (eave + 0.2) / 2)), c: beamC });
       const pm = new THREE.Mesh(mergeGeoms(parts), trimMat); pm.castShadow = true; pm.receiveShadow = true; g.add(pm);
       { const [px, pz] = toWorld(b, 5.4, hd + 2.85); box(px, pz, 7.6, 0.25, b.rot); }
+      // bell tower: four pale timber posts braced crosswise between two rings, a bronze bell, a low hipped metal cap
+      const tw = new THREE.Group(); tw.position.set(-5.2, 0, hd - 1.2); g.add(tw);
+      const tp = [], pale = C('#b9a587'), y0t = floor + hF - 0.2, y1t = floor + hF + rise * 0.45 + 0.3, y2t = floor + hF + rise + 2.9, sx = 1.25, sz = 1.25;
+      for (const [x, z] of [[-sx, -sz], [sx, -sz], [-sx, sz], [sx, sz]]) tp.push({ g: new THREE.BoxGeometry(0.3, y2t - y0t, 0.3).translate(x, (y0t + y2t) / 2, z), c: pale });
+      for (const y of [y1t, y2t - 0.25]) {
+        for (const z of [-sz, sz]) tp.push({ g: new THREE.BoxGeometry(2 * sx + 0.3, 0.2, 0.2).translate(0, y, z), c: pale });
+        for (const x of [-sx, sx]) tp.push({ g: new THREE.BoxGeometry(0.2, 0.2, 2 * sz + 0.3).translate(x, y, 0), c: pale });
+      }
+      for (const z of [-sz, sz]) { tp.push(beamPart(-sx, y1t, z, sx, y2t - 0.25, z, 0.14, 0.14, pale)); tp.push(beamPart(sx, y1t, z, -sx, y2t - 0.25, z, 0.14, 0.14, pale)); }
+      for (const x of [-sx, sx]) { tp.push(beamPart(x, y1t, -sz, x, y2t - 0.25, sz, 0.14, 0.14, pale)); tp.push(beamPart(x, y1t, sz, x, y2t - 0.25, -sz, 0.14, 0.14, pale)); }
+      tp.push({ g: new THREE.BoxGeometry(2 * sx + 0.9, 0.22, 2 * sz + 0.9).translate(0, y2t + 0.05, 0), c: C('#3a2f28') });
+      const tm2 = new THREE.Mesh(mergeGeoms(tp), trimMat); tm2.castShadow = true; tm2.receiveShadow = true; tw.add(tm2);
+      const capT = new THREE.Mesh(new THREE.ConeGeometry(2.25, 0.75, 4), roofMat('#b9b8b2')); capT.rotation.y = Math.PI / 4; capT.position.y = y2t + 0.53; capT.castShadow = true; tw.add(capT);
+      const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.42, 0.6, 16), new THREE.MeshStandardMaterial({ color: C('#5e4a2c'), metalness: 0.8, roughness: 0.4 })); bell.position.y = y2t - 0.85; bell.castShadow = true; tw.add(bell);
     }
     if (b.walk) {
       // Castle Gymnasium inside (school photos): maple court with red keys, dark glulam arches under a white deck, daylight
@@ -1623,20 +1653,25 @@ function createWorld(canvas) {
     // union storey: dark boards outside, warm white inside, door onto the square in the north wall
     const out = wallMat('wood'), inn = M('#ece6d8', 0.9);
     wallLine(U, g, 'x', -hw, hw, -hd, -1, yU, hU, 0.3, out, inn, [[-0.5, 3.4, 2.7]]);
-    wallLine(U, g, 'z', -hd, hd, hw, 1, yU, hU, 0.3, out, inn, []);
+    const eastWin = [-4.5, 0.5, 5.5];
+    wallLine(U, g, 'z', -hd, hd, hw, 1, yU, hU, 0.3, out, inn, eastWin.map((c) => [c, 3.0, 2.6, 0.9]));
     wallLine(U, g, 'z', -hd, hd, -hw, -1, yU, hU, 0.3, out, inn, []);
     const gableShape = () => { const sh = new THREE.Shape(); sh.moveTo(-hw, 0); sh.lineTo(hw, 0); sh.lineTo(hw, hU); sh.lineTo(0, hU + rise); sh.lineTo(-hw, hU); sh.closePath(); return sh; };
     const facadeTex = canvasTex(1248, 464, (c, W2, H2) => {
       const m = 80, Y = (y2) => H2 - y2 * m, frame = '#f4f2ea';
       c.fillStyle = '#3e2f25'; c.fillRect(0, 0, W2, H2);
       for (let x = 0; x < W2; x += 12) { c.fillStyle = 'rgba(10,5,2,0.5)'; c.fillRect(x, 0, 3, H2); }
-      const row = (x0, x1, y0, y1, n) => { c.fillStyle = frame; c.fillRect(x0 * m - 7, Y(y1) - 7, (x1 - x0) * m + 14, (y1 - y0) * m + 14); const gr = c.createLinearGradient(0, Y(y1), 0, Y(y0)); gr.addColorStop(0, '#a9bfcd'); gr.addColorStop(1, '#3d5163'); c.fillStyle = gr; c.fillRect(x0 * m, Y(y1), (x1 - x0) * m, (y1 - y0) * m); c.fillStyle = frame; for (let i = 1; i < n; i++) c.fillRect((x0 + (x1 - x0) * i / n) * m - 4, Y(y1), 8, (y1 - y0) * m); };
+      const row = (x0, x1, y0, y1, n) => { c.fillStyle = frame; c.fillRect(x0 * m - 7, Y(y1) - 7, (x1 - x0) * m + 14, (y1 - y0) * m + 14); c.clearRect(x0 * m, Y(y1), (x1 - x0) * m, (y1 - y0) * m); c.fillStyle = frame; for (let i = 1; i < n; i++) c.fillRect((x0 + (x1 - x0) * i / n) * m - 4, Y(y1), 8, (y1 - y0) * m); };
       row(0.7, 14.9, 0.5, 1.75, 6); row(0.7, 14.9, 1.95, 3.0, 6); row(3.6, 12.0, 3.35, 4.35, 4);
       c.fillStyle = frame; c.fillRect(0, Y(0.14), W2, 11);
     });
     const sg = new THREE.ShapeGeometry(gableShape()), sp = sg.attributes.position, suv = sg.attributes.uv;
     for (let i = 0; i < sp.count; i++) suv.setXY(i, (sp.getX(i) + hw) / (2 * hw), sp.getY(i) / 5.8);
-    add(sg, new THREE.MeshStandardMaterial({ map: facadeTex, roughness: 0.6, side: THREE.DoubleSide }), 0, yU, hd, false);
+    add(sg, new THREE.MeshStandardMaterial({ map: facadeTex, roughness: 0.6, side: THREE.DoubleSide, alphaTest: 0.5 }), 0, yU, hd, false);
+    // clear glass in the window wall and the east windows, so the lawn and the field show from inside
+    const glass = new THREE.MeshStandardMaterial({ color: C('#cfe1ec'), roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
+    add(new THREE.ShapeGeometry(gableShape()), glass, 0, yU, hd - 0.03, false);
+    for (const c of eastWin) { const gp = add(new THREE.PlaneGeometry(3.0, 1.7), glass, hw, yU + 1.75, c, false); gp.rotation.y = Math.PI / 2; }
     box(U.x, U.z + hd, hw, 0.2, 0);
     const tri = new THREE.Shape(); tri.moveTo(-hw - 0.15, hU); tri.lineTo(hw + 0.15, hU); tri.lineTo(0, hU + rise); tri.closePath();
     add(new THREE.ShapeGeometry(tri), M('#3e2f25', 0.85, 0, { side: THREE.DoubleSide }), 0, yU, -hd, false);
@@ -1694,9 +1729,16 @@ function createWorld(canvas) {
     const sqt = squareTableGeo();
     for (const x of [-12.4, -8.0, -3.4, 1.4, 5.4]) { const t = new THREE.Mesh(sqt, trimMat); t.position.set(U.x + x, yL + 0.12, U.z + hd + 1.75); t.rotation.y = 0.12; t.castShadow = true; t.receiveShadow = true; scene.add(t); colliders.circles.push({ x: U.x + x, z: U.z + hd + 1.75, r: 0.95 }); }
     // stair down the east side, from the square to the store
-    const nS = Math.round((yU - yL) / 0.18), L = 11.5, tread = L / nS, sx0 = 210.0 - U.x, sx1 = 214.6 - U.x;
+    const nS = Math.round((yU - yL) / 0.18), L = 11.5, tread = L / nS, sx0 = 213.0 - U.x, sx1 = 215.2 - U.x;
     for (let i = 0; i < nS; i++) { const top = yU - (i + 1) * (yU - yL) / nS; parts.push({ g: new THREE.BoxGeometry(sx1 - sx0, top - yL + 0.5, tread + 0.02).translate((sx0 + sx1) / 2, (top + yL - 0.5) / 2, -80 - U.z + (i + 0.5) * tread), c: C('#bdb8ae') }); }
     for (const x of [sx0 + 0.1, sx1 - 0.1]) { parts.push(beamPart(x, yU + 0.95, -80 - U.z, x, yL + 0.95, -68.5 - U.z, 0.06, 0.06, C('#5d6166'))); for (let t = 0; t <= 1.001; t += 0.25) parts.push({ g: new THREE.BoxGeometry(0.05, 0.95, 0.05).translate(x, yU + (yL - yU) * t + 0.47, -80 - U.z + 11.5 * t), c: C('#5d6166') }); }
+    // the nook between the store and the stair: paving, a lava retaining wall at its head, two grey picnic tables
+    add(new THREE.BoxGeometry(2 * NOOK.hw, 0.2, 2 * NOOK.hd), concreteMat, NOOK.x - U.x, yL - 0.04, NOOK.z - U.z);
+    { const w = 2 * NOOK.hw + 0.3, h = yU - yL + 0.6; add(uvBox(new THREE.BoxGeometry(w, h, 0.5), [w, h, 0.5], 8, 4), wallMat('stone'), NOOK.x - U.x + 0.15, yL + h / 2 - 0.5, -80.35 - U.z); }
+    parts.push(beamPart(209.6 - U.x, yU + 1.0, -80.1 - U.z, 212.9 - U.x, yU + 1.0, -80.1 - U.z, 0.06, 0.06, C('#5d6166')));
+    for (let x = 209.7; x <= 212.95; x += 1.1) parts.push({ g: new THREE.BoxGeometry(0.05, 1.0, 0.05).translate(x - U.x, yU + 0.5, -80.1 - U.z), c: C('#5d6166') });
+    const gpt = greyPicnicGeo();
+    for (const [tx, tz] of NOOK.tables) { const t = new THREE.Mesh(gpt, trimMat); t.position.set(tx, yL + 0.06, tz); t.rotation.y = Math.PI / 2; t.castShadow = true; t.receiveShadow = true; scene.add(t); box(tx, tz, 0.85, 1.15, 0); }
     const pm = new THREE.Mesh(mergeGeoms(parts), trimMat); pm.castShadow = true; pm.receiveShadow = true; g.add(pm);
   })();
 
@@ -1888,6 +1930,8 @@ function createWorld(canvas) {
   (function moreBenches() {
     [[-22, uf.hd + 3.5], [22, uf.hd + 3.5]].forEach(([lx, lz]) => { const [x, z] = toWorld(uf, lx, lz); bench(x, z, uf.rot + Math.PI); });
     [[1100, 612, 0], [1180, 605, 0], [600, 402, -0.4], [565, 160, 0.6], [985, 640, -0.3]].forEach(([px, py, r]) => { const [x, z] = P(px, py); bench(x, z, r); });
+    // the two grey picnic tables in the nook beside the Student Store, two places on each bench
+    for (const [tx, tz] of NOOK.tables) for (const sx of [-1, 1]) for (const dz of [-0.5, 0.5]) seats.push({ id: 'nk' + seats.length, x: tx + sx * 0.68, z: tz + dz, y: Y_LOW + 0.56, ry: -sx * Math.PI / 2 });
     // the concrete tiers by the track, facing the field
     for (let k = 1; k <= TIERS; k++) for (let lx = -19.8; lx <= 19.8; lx += 4.4) {
       const [x, z] = toWorld(TRACK, lx, TIER_Z - TIER_D0 - (k - 1) * TIER_W - 0.2);
