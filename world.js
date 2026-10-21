@@ -92,7 +92,7 @@ function createWorld(canvas) {
     { at: [1150, 532], w: 100, d: 66, phi: 2, h: 6.4, wall: 'wood', ends: 'stone', roof: 'hip', rise: 0.2, solar: 1 },
     { at: [1258, 497], w: 74, d: 46, phi: 3, h: 6.0, wall: 'wood', ends: 'stone', roof: 'hip', rise: 0.24 },
     // north edge
-    { at: [515, 112], w: 82, d: 36, phi: 32, h: 4.2, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.7, roofColor: '#5f5852', name: 'chapel' },
+    { at: [515, 112], w: 82, d: 36, phi: 32, h: 4.0, wall: 'wood', ends: 'wood', roof: 'gable', rise: 0.26, roofColor: '#b9b8b2', name: 'chapel', label: 'Davies Chapel' },
     { at: [916, 186], w: 76, d: 40, phi: -15, h: 3.3, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1 },
     { at: [1215, 150], w: 210, d: 34, phi: 2, h: 6.2, wall: 'wood', ends: 'stone', roof: 'hip', rise: 0.24 },
     { at: [1160, 112], w: 44, d: 34, phi: 2, h: 6.2, wall: 'wood', ends: 'stone', roof: 'hip', rise: 0.24 },
@@ -101,12 +101,11 @@ function createWorld(canvas) {
     { at: [1415, 262], w: 200, d: 34, phi: 43, h: 6.2, wall: 'wood', ends: 'stone', roof: 'hip', rise: 0.24 },
     { at: [1412, 436], w: 190, d: 40, phi: 37, h: 6.2, wall: 'wood', ends: 'stone', roof: 'hip', rise: 0.24 },
     // athletics complex
-    { at: [1352, 673], w: 104, d: 82, phi: 33, h: 8, wall: 'gym', ends: 'stone', roof: 'gable', rise: 0.14, roofColor: '#5d6cab', name: 'blue' },
     { at: [1225, 707], w: 80, d: 26, phi: 0, h: 3.4, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1 },
     { at: [1237, 792], w: 120, d: 96, phi: 0, h: 9, wall: 'gym', roof: 'gable', rise: 0.12, solar: 1 },
-    { at: [1352, 798], w: 104, d: 110, phi: 0, h: 10, wall: 'gym', ends: 'stone', roof: 'gable', rise: 0.12, roofColor: '#a9a9a6' },
-    { at: [1258, 915], w: 196, d: 120, phi: 0, h: 12, wall: 'gym', roof: 'gable', rise: 0.1, roofColor: '#efefec' },
-    { at: [1636, 668], w: 150, d: 116, phi: 30, h: 10, wall: 'gym', ends: 'stone', roof: 'hip', rise: 0.28, roofColor: '#e9e9e6' },
+    { at: [1352, 798], w: 104, d: 110, phi: 0, h: 10, wall: 'gym', roof: 'gable', rise: 0.12, roofColor: '#c9c9c5', label: 'Castle Gymnasium' },
+    { at: [1258, 915], w: 196, d: 120, phi: 0, h: 11, wall: 'gym', roof: 'gable', rise: 0.1, roofColor: '#f1f1ee', label: 'Rutgers Tennis Center' },
+    { at: [1636, 668], w: 150, d: 116, phi: 30, h: 10, wall: 'gym', roof: 'gable', rise: 0.3, roofColor: '#e9e9e6', name: 'gpac', label: 'Gates Performing Arts Center' },
     { at: [1658, 780], w: 56, d: 46, phi: 25, h: 3.6, wall: 'wood', ends: 'stone', roof: 'hip' },
     // little sheds by the track and baseball field
     { at: [742, 842], w: 30, d: 16, phi: 56, h: 2.8, wall: 'white', roof: 'gable', rise: 0.3 },
@@ -209,6 +208,11 @@ function createWorld(canvas) {
   { const [cx, cz] = toWorld(bb, 45, 0); addPad(cx, cz, 55, 50, bb.rot, 14); }
   addPad(pk.x, pk.z, pk.hw + 2, pk.hd + 2, pk.rot, 8);
   for (const b of BUILDINGS) addPad(b.x, b.z, b.w / 2 + 2.5, b.d / 2 + 2.5, b.rot, 7);
+  const POOL = (() => { const [x, z] = P(1352, 673); return { x, z, rot: -33 * RAD }; })();
+  addPad(POOL.x, POOL.z, 20, 15, POOL.rot, 8);
+  const SOLAR_FIELD = (() => { const [x, z] = P(800, -30); return { x, z, rot: 0 }; })();
+  const FARM = (() => { const [x, z] = P(575, -20); return { x, z, rot: 0.15 }; })();
+  addPad(FARM.x, FARM.z, 22, 14, FARM.rot, 10);
 
   const roads = ROADS.map((r) => Object.assign({}, r, { pl: poly(PP(r.pts)) }));
   const treeLines = TREE_LINES.map((t) => Object.assign({}, t, { pl: poly(PP(t.pts)) }));
@@ -623,10 +627,12 @@ function createWorld(canvas) {
           g.fillStyle = 'rgba(255,255,255,0.12)'; g.beginPath(); g.moveTo(x + 6, 8); g.lineTo(x + 30, 8); g.lineTo(x + 6, H * 0.6); g.fill();
         }
       } else if (kind === 'gym') {
-        boards('#7b6450', 16);
-        g.fillStyle = '#2b2018'; g.fillRect(0, H * 0.08, W, H * 0.14);
-        for (let x = 0; x < W; x += 64) { const gr = g.createLinearGradient(0, H * 0.09, 0, H * 0.21); gr.addColorStop(0, '#3a4b5c'); gr.addColorStop(1, '#5e7386'); g.fillStyle = gr; g.fillRect(x + 6, H * 0.09, 52, H * 0.12); }
-        g.fillStyle = '#5a4535'; g.fillRect(W * 0.38, H * 0.74, W * 0.24, H * 0.26);
+        g.fillStyle = '#d9d7d0'; g.fillRect(0, 0, W, H);
+        for (let x = 0; x < W; x += 16) { g.fillStyle = 'rgba(0,0,0,0.08)'; g.fillRect(x, 0, 3, H); g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x + 3, 0, 2, H); }
+        g.fillStyle = '#4a4d52'; g.fillRect(0, H * 0.07, W, H * 0.15);
+        for (let x = 0; x < W; x += 64) { const gr = g.createLinearGradient(0, H * 0.08, 0, H * 0.21); gr.addColorStop(0, '#34485c'); gr.addColorStop(1, '#6a8094'); g.fillStyle = gr; g.fillRect(x + 6, H * 0.08, 52, H * 0.13); }
+        g.fillStyle = '#9a9890'; g.fillRect(0, H * 0.9, W, H * 0.1);
+        g.fillStyle = '#6d5a48'; g.fillRect(W * 0.4, H * 0.72, W * 0.2, H * 0.28);
       } else if (kind === 'white') {
         g.fillStyle = '#ebe8e0'; g.fillRect(0, 0, W, H);
         for (let i = 0; i < 3000; i++) { g.fillStyle = r() < 0.5 ? 'rgba(120,110,90,0.06)' : 'rgba(255,255,255,0.12)'; g.fillRect(r() * W, r() * H, 2, 2); }
@@ -798,12 +804,32 @@ function createWorld(canvas) {
       const m = new THREE.Mesh(mergeGeoms(parts), trimMat); m.castShadow = true; m.receiveShadow = true; g.add(m);
     }
     if (b.name === 'chapel') {
-      const st = new THREE.Group(); st.position.set(b.w / 2 - 1.8, floor + b.h + gableRise * 0.5, 0); g.add(st);
-      const tower = new THREE.Mesh(new THREE.BoxGeometry(2.4, 4.2, 2.4), wallMat('wood')); tower.position.y = 2.1; tower.castShadow = true; st.add(tower);
-      const spire = new THREE.Mesh(new THREE.ConeGeometry(1.9, 4.5, 4), roofMat('#5f5852')); spire.position.y = 6.45; spire.rotation.y = Math.PI / 4; spire.castShadow = true; st.add(spire);
+      // open timber bell frame standing at the entry end
+      const st = new THREE.Group(); st.position.set(b.w / 2 + 1.6, 0, 0); g.add(st);
+      const parts = [], dk = C(WOOD_DARK), top = floor + b.h + gableRise + 1.6;
+      for (const [x, z] of [[-0.9, -1.1], [0.9, -1.1], [-0.9, 1.1], [0.9, 1.1]]) parts.push({ g: new THREE.BoxGeometry(0.36, top, 0.36).translate(x, top / 2, z), c: dk });
+      for (const y of [top * 0.45, top * 0.8]) { parts.push({ g: new THREE.BoxGeometry(2.1, 0.22, 0.22).translate(0, y, -1.1), c: dk }); parts.push({ g: new THREE.BoxGeometry(2.1, 0.22, 0.22).translate(0, y, 1.1), c: dk }); parts.push({ g: new THREE.BoxGeometry(0.22, 0.22, 2.5).translate(-0.9, y, 0), c: dk }); parts.push({ g: new THREE.BoxGeometry(0.22, 0.22, 2.5).translate(0.9, y, 0), c: dk }); }
+      const fm = new THREE.Mesh(mergeGeoms(parts), trimMat); fm.castShadow = true; st.add(fm);
+      const cap = new THREE.Mesh(roofParts('gable', 2.2, 2.6, 1.1, 0.4).top, roofMat('#b9b8b2')); cap.position.y = top; cap.castShadow = true; st.add(cap);
+      const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.38, 0.55, 14), new THREE.MeshStandardMaterial({ color: C('#9a7b3c'), metalness: 0.8, roughness: 0.35 }));
+      bell.position.y = top * 0.8 - 0.45; st.add(bell);
       const cr = new THREE.MeshStandardMaterial({ color: C('#efe9dc'), roughness: 0.6 });
-      const cross1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.2, 0.12), cr); cross1.position.y = 9.2; st.add(cross1);
-      const cross2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.7), cr); cross2.position.y = 9.4; st.add(cross2);
+      const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.0, 0.1), cr); c1.position.y = top + 1.6; st.add(c1);
+      const c2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.6), cr); c2.position.y = top + 1.8; st.add(c2);
+    }
+    if (b.name === 'gpac') {
+      // tall stage house behind the hall and a deep entry canopy on posts, as in the drone footage
+      const fly = new THREE.Group(); fly.position.set(b.w * 0.18, 0, -b.d * 0.12); g.add(fly);
+      const fw = b.w * 0.42, fd = b.d * 0.5, fh = b.h + 6;
+      const fwalls = new THREE.Mesh(wallsGeo(fw, fd, fh, fh, fh, fd * 0.3 * 0.5), [wallMat('gym'), wallMat('gym'), wallMat('glass')]); fwalls.castShadow = true; fly.add(fwalls);
+      const fr = roofParts('gable', fw, fd, fd * 0.3, 0.8); const ft = new THREE.Mesh(fr.top, roofMat('#efefec')); ft.position.y = fh; ft.castShadow = true; fly.add(ft);
+      const ftr = new THREE.Mesh(fr.trim, trimMat); ftr.position.y = fh; fly.add(ftr);
+      const can = new THREE.Group(); can.position.set(-b.w * 0.1, 0, b.d / 2); g.add(can);
+      const cw = b.w * 0.55, cd = 6;
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(cw, 0.35, cd), roofMat('#efefec')); slab.position.set(0, 4.6, cd / 2); slab.castShadow = true; can.add(slab);
+      const parts = []; for (let x = -cw / 2 + 0.5; x <= cw / 2; x += 4) parts.push({ g: new THREE.BoxGeometry(0.3, 4.5, 0.3).translate(x, 2.25, cd - 0.4), c: C('#e9e7e1') });
+      const pm = new THREE.Mesh(mergeGeoms(parts), trimMat); pm.castShadow = true; can.add(pm);
+      const glassFront = new THREE.Mesh(new THREE.PlaneGeometry(cw * 0.8, 3.4), wallMat('glass')); glassFront.position.set(0, 1.8, 0.03); can.add(glassFront);
     }
     if (b.name === 'ml' || b.name === 'tech') {
       // building name plaque on the lava-rock end wall
@@ -818,6 +844,35 @@ function createWorld(canvas) {
     return g;
   }
   BUILDINGS.forEach(building);
+
+  // ---------- Dowsett Pool: outdoor 25 m pool with deck, coping and a changing-room wing ----------
+  (function dowsettPool() {
+    const y = groundH(POOL.x, POOL.z);
+    const g = new THREE.Group(); g.position.set(POOL.x, y, POOL.z); g.rotation.y = POOL.rot; scene.add(g);
+    const WL = 25, WW = 16.5, DL = 36, DW = 27;
+    const deckShape = new THREE.Shape(); deckShape.moveTo(-DL / 2, -DW / 2); deckShape.lineTo(DL / 2, -DW / 2); deckShape.lineTo(DL / 2, DW / 2); deckShape.lineTo(-DL / 2, DW / 2); deckShape.closePath();
+    const hole = new THREE.Path(); hole.moveTo(-WL / 2, -WW / 2); hole.lineTo(-WL / 2, WW / 2); hole.lineTo(WL / 2, WW / 2); hole.lineTo(WL / 2, -WW / 2); hole.closePath(); deckShape.holes.push(hole);
+    const deck = new THREE.Mesh(new THREE.ShapeGeometry(deckShape).rotateX(-Math.PI / 2), overlayMat(roadTex.path, { color: C('#e8e4da') }));
+    deck.position.y = 0.12; deck.receiveShadow = true; g.add(deck);
+    const waterTex = canvasTex(512, 340, (c, W2, H2) => {
+      const gr = c.createLinearGradient(0, 0, W2, H2); gr.addColorStop(0, '#2ea8d6'); gr.addColorStop(1, '#1f8fc4'); c.fillStyle = gr; c.fillRect(0, 0, W2, H2);
+      const r = rng(31); for (let i = 0; i < 260; i++) { c.strokeStyle = 'rgba(255,255,255,' + (0.05 + r() * 0.08) + ')'; c.lineWidth = 1 + r() * 2; c.beginPath(); const x = r() * W2, yy = r() * H2; c.moveTo(x, yy); c.bezierCurveTo(x + 10, yy - 6, x + 20, yy + 6, x + 34, yy); c.stroke(); }
+      c.fillStyle = '#16507f'; for (let i = 0; i < 8; i++) { const yy = (i + 0.5) / 8 * H2; c.fillRect(W2 * 0.06, yy - 2, W2 * 0.88, 4); c.fillRect(W2 * 0.06, yy - 8, 4, 16); c.fillRect(W2 * 0.94 - 4, yy - 8, 4, 16); }
+    });
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(WL, WW).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: waterTex, roughness: 0.08, metalness: 0.15, emissive: C('#0b3a52'), transparent: true, opacity: 0.92 }));
+    // the terrain under the pad is solid, so the water sits just below the deck
+    water.position.y = 0.1; water.receiveShadow = true; g.add(water);
+    const coping = new THREE.MeshStandardMaterial({ color: C('#f4f2ec'), roughness: 0.6 });
+    for (const [w, d, x, z] of [[WL + 0.8, 0.4, 0, WW / 2 + 0.2], [WL + 0.8, 0.4, 0, -WW / 2 - 0.2], [0.4, WW, WL / 2 + 0.2, 0], [0.4, WW, -WL / 2 - 0.2, 0]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 0.12, d), coping); m.position.set(x, 0.16, z); m.receiveShadow = true; g.add(m); }
+    // starting blocks along the deep end
+    for (let i = 0; i < 8; i++) { const sb = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 0.6), coping); sb.position.set(WL / 2 + 0.6, 0.45, -WW / 2 + (i + 0.5) * WW / 8); sb.castShadow = true; g.add(sb); }
+    // lane-rope floats
+    const floatMat = new THREE.MeshStandardMaterial({ color: C('#e9473b'), roughness: 0.5 });
+    for (let i = 1; i < 8; i++) { const lr = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, WL, 6), floatMat); lr.rotation.z = Math.PI / 2; lr.position.set(0, 0.13, -WW / 2 + i * WW / 8); g.add(lr); }
+    const [bx, bz] = toWorld(POOL, 0, -(DW / 2 - 2.5));
+    building({ x: bx, z: bz, w: 30, d: 5, h: 3, rot: POOL.rot, wall: 'wood', ends: 'stone', roof: 'shed', rise: 0.2 });
+    box(POOL.x, POOL.z, WL / 2 + 0.3, WW / 2 + 0.3, POOL.rot);
+  })();
 
   // pool deck and pool east of the main buildings, courtyard deck
   (function pool() {
@@ -1080,6 +1135,66 @@ function createWorld(canvas) {
     tuftMesh = m;
   })();
   var tuftMesh;
+
+  // ---------- roundabout at the Gates Performing Arts Center ----------
+  (function roundabout() {
+    const [cx, cz] = P(1610, 748), R0 = 10;
+    const ring = []; for (let i = 0; i <= 48; i++) { const a = i / 48 * Math.PI * 2; ring.push([cx + Math.cos(a) * R0, cz + Math.sin(a) * R0]); }
+    ribbon(ring, 5.5, roadMats.campus, 0.085, roadSpan.campus);
+    const island = drape(new THREE.CircleGeometry(R0 - 2.8, 32).rotateX(-Math.PI / 2), cx, cz, 0, 0.1);
+    scene.add(Object.assign(new THREE.Mesh(island, overlayMat(null, { color: C('#4f7d33') })), { receiveShadow: true }));
+    for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2, rr = i % 3 ? 4 : 1.5; const x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr; const b = new THREE.Mesh(BUSH.geo, foliageMat); b.position.set(x, groundH(x, z), z); b.scale.setScalar(0.55 + (i % 3) * 0.15); b.castShadow = true; scene.add(b); }
+    colliders.circles.push({ x: cx, z: cz, r: R0 - 3 });
+  })();
+
+  // ---------- ground-mounted solar field on the north slope (the Energy Lab's array) ----------
+  (function solarField() {
+    const items = [];
+    for (let row = 0; row < 9; row++) for (let seg = 0; seg < 7; seg++) {
+      const [x, z] = toWorld(SOLAR_FIELD, -36 + seg * 12, -24 + row * 6.5);
+      items.push({ x, z });
+    }
+    const pm = panelMatFor(12, 3.2);
+    instanced(new THREE.BoxGeometry(11.6, 0.08, 3.2).rotateX(0.42), pm, items, (d, it) => { d.position.set(it.x, groundH(it.x, it.z) + 1.25, it.z); d.rotation.y = SOLAR_FIELD.rot; }, null, true);
+    const legs = [];
+    for (const it of items) for (const lx of [-5, 0, 5]) { const [x, z] = toWorld({ x: it.x, z: it.z, rot: SOLAR_FIELD.rot }, lx, 0); legs.push({ x, z }); }
+    instanced(new THREE.CylinderGeometry(0.06, 0.06, 1.4, 6).translate(0, 0.7, 0), new THREE.MeshStandardMaterial({ color: C('#9aa0a6'), metalness: 0.6, roughness: 0.4 }), legs, (d, it) => { d.position.set(it.x, groundH(it.x, it.z) - 0.1, it.z); }, null, false);
+    items.forEach((it) => box(it.x, it.z, 6, 1.7, SOLAR_FIELD.rot));
+  })();
+
+  // ---------- Ulu Mālama outdoor classroom: terrace beds, water tanks and a shed ----------
+  (function farm() {
+    const tarp = overlayMat(null, { color: C('#2b2b2e'), roughness: 0.6 });
+    const soil = overlayMat(null, { color: C('#5a4330'), roughness: 1 });
+    for (let i = 0; i < 6; i++) {
+      const [x, z] = toWorld(FARM, -15 + (i % 3) * 10, -6 + Math.floor(i / 3) * 8);
+      scene.add(Object.assign(new THREE.Mesh(drape(new THREE.PlaneGeometry(8, 4.5, 4, 2).rotateX(-Math.PI / 2), x, z, FARM.rot, 0.08), i % 2 ? tarp : soil), { receiveShadow: true }));
+    }
+    const tankMat = new THREE.MeshStandardMaterial({ color: C('#3d5a3a'), roughness: 0.7 });
+    for (const lx of [12, 16]) { const [x, z] = toWorld(FARM, lx, -5); const t = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 2.2, 20), tankMat); t.position.set(x, groundH(x, z) + 1.1, z); t.castShadow = true; scene.add(t); colliders.circles.push({ x, z, r: 1.8 }); }
+    const [sx, sz] = toWorld(FARM, 14, 5);
+    building({ x: sx, z: sz, w: 8, d: 4.5, h: 2.6, rot: FARM.rot, wall: 'wood', ends: 'wood', roof: 'shed', rise: 0.2 });
+  })();
+
+  // ---------- name signs: lava-rock base, dark board, cream letters ----------
+  function sign(x, z, rot, text, wide) {
+    const w = wide ? 5.2 : 3.4, y = groundH(x, z);
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; scene.add(g);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.7, 0.6), wallMat('stone')); base.position.y = 0.35; base.castShadow = true; g.add(base);
+    const tx = canvasTex(512, 96, (c, W2, H2) => { c.fillStyle = '#2b2018'; c.fillRect(0, 0, W2, H2); c.strokeStyle = '#c9b48a'; c.lineWidth = 4; c.strokeRect(6, 6, W2 - 12, H2 - 12); c.fillStyle = '#f1e9d6'; c.font = 'bold ' + (text.length > 22 ? 34 : 42) + 'px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, W2 / 2, H2 / 2 + 2); });
+    const face = new THREE.MeshStandardMaterial({ map: tx, roughness: 0.7 }), edge = new THREE.MeshStandardMaterial({ color: C('#2b2018'), roughness: 0.7 });
+    const board = new THREE.Mesh(new THREE.BoxGeometry(w, w * 96 / 512, 0.12), [edge, edge, edge, edge, face, face]);
+    board.position.y = 0.7 + w * 48 / 512 + 0.05; board.castShadow = true; g.add(board);
+    box(x, z, w / 2 + 0.3, 0.4, rot);
+  }
+  for (const b of BUILDINGS) {
+    if (!b.label) continue;
+    const [x, z] = toWorld(b, b.name === 'chapel' ? b.w / 2 + 2 : -b.w / 4, b.d / 2 + (b.name === 'chapel' ? 6 : 6));
+    sign(x, z, b.rot, b.label, b.label.length > 18);
+  }
+  { const [x, z] = toWorld(POOL, -8, 17); sign(x, z, POOL.rot, 'Dowsett Pool'); }
+  { const [x, z] = toWorld(TRACK, -(TL + R_OUT + 6), -8); sign(x, z, TRACK.rot - Math.PI / 2, 'Stanford W. Shutes Track', true); }
+  { const [x, z] = P(570, 1203); sign(x, z, -0.45, 'Hawaiʻi Preparatory Academy', true); }
 
   // ---------- cars, bus ----------
   (function cars() {
