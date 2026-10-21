@@ -77,6 +77,38 @@ body { font-family: var(--body); overflow: hidden; }
 #ctx { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(146px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 32px); padding: 6px 12px; font-size: 13px; pointer-events: none; white-space: nowrap; }
 #raceBig { position: absolute; left: 0; right: 0; top: 24%; text-align: center; font-family: var(--display); font-weight: 700; font-size: clamp(56px, 12vw, 120px); color: var(--foam); text-shadow: 0 4px 30px rgba(236, 79, 134, 0.7); pointer-events: none; }
 #raceHud { position: absolute; left: 50%; transform: translateX(-50%); top: calc(14px + env(safe-area-inset-top, 0px)); padding: 8px 14px; font-size: 15px; font-variant-numeric: tabular-nums; pointer-events: none; text-align: center; line-height: 1.5; }
+#vf { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+#app.cam #help { display: none; }
+#vf .vfFrame { position: absolute; left: 50%; top: 50%; width: min(100vw, 150vh); height: min(100vh, 66.667vw); transform: translate(-50%, -50%); box-shadow: 0 0 0 100vmax rgba(8, 6, 14, 0.5); }
+#vf .vfFrame::before { content: ''; position: absolute; inset: 7%; border: 1.5px solid rgba(255, 252, 240, 0.75); border-radius: 4px; }
+#vf .vfFrame::after { content: ''; position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; margin: -11px; border: 1.5px solid rgba(255, 252, 240, 0.7); border-radius: 50%; }
+#vf .vfInfo { position: absolute; left: 9%; bottom: 9%; font-family: "Courier New", monospace; font-weight: 700; font-size: clamp(14px, 1.8vw, 20px); color: #ffe7a8; text-shadow: 0 1px 6px rgba(0,0,0,0.7); letter-spacing: 0.08em; }
+#vf .vfTools { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 10px; align-items: center; pointer-events: auto; }
+#vfShoot { width: 64px; height: 64px; border-radius: 50%; border: 4px solid rgba(255,255,255,0.85); background: rgba(255,255,255,0.25); cursor: pointer; padding: 0; }
+#vfShoot:active { background: rgba(255,255,255,0.7); }
+#vfShoot:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; }
+#vfFlash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+#vfFlash.go { animation: vfFlash 0.45s ease-out; }
+@keyframes vfFlash { 0% { opacity: 0.95; } 100% { opacity: 0; } }
+#album { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(980px, calc(100% - 24px)); max-height: calc(100% - 110px); display: flex; flex-direction: column; gap: 10px; padding: 12px; z-index: 6; }
+#album[hidden], #photoView[hidden] { display: none; }
+.albhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 15px; }
+.albtools { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--mute); }
+#albumGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; overflow-y: auto; padding: 6px; }
+#albumEmpty { color: var(--mute); font-size: 14px; padding: 18px 6px; }
+.ph { padding: 6px 6px 8px; background: #f7f3ea; border: 0; border-radius: 3px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); cursor: pointer; transform: rotate(var(--r, 0deg)); font: inherit; text-align: left; }
+.ph:hover { transform: rotate(0deg) scale(1.03); }
+.ph:focus-visible { outline: 2px solid var(--coral); outline-offset: 3px; }
+.ph img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; background: #2a2018; }
+.ph.dev img { animation: develop 5s ease-out; }
+@keyframes develop { from { filter: brightness(0.12) sepia(1) contrast(0.5); } 55% { filter: brightness(0.75) sepia(0.45) contrast(0.85); } to { filter: none; } }
+.ph small { display: block; margin-top: 6px; font-size: 11px; color: #5a5048; }
+#photoView { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; background: rgba(12, 10, 18, 0.82); padding: 16px; }
+#photoView .pvwrap { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: min(1000px, 100%); }
+#photoView figure { margin: 0; background: #f7f3ea; padding: 12px 12px 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+#pvImg { display: block; max-width: 100%; max-height: calc(100vh - 190px); }
+#pvCap { color: #4a4038; font-size: 13px; margin-top: 8px; }
+.pvbar { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 #filmBtn { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(196px + env(safe-area-inset-bottom, 0px)); z-index: 4; padding: 10px 18px; font-size: 15px; }
 #film { position: absolute; inset: 0; pointer-events: none; z-index: 8; }
 #film .lb { position: absolute; left: 0; right: 0; height: 9vh; background: #000; }
@@ -156,11 +188,35 @@ body { font-family: var(--body); overflow: hidden; }
     <div id="peers" class="panel" aria-live="polite"></div>
   </header>
 
-  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · P first person · H heart · G hold hands · B carry on your back · N hop on their back · E whiteboard · K kiss · L race · M voice · Enter talk</div>
+  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · P first person · H heart · G hold hands · B carry on your back · N hop on their back · E whiteboard · K kiss · L race · M voice · O camera · I album · Enter talk</div>
   <div id="ctx" class="panel" role="status" hidden></div>
   <div id="goal" hidden>Goal!</div>
   <div id="raceBig" hidden></div>
   <div id="raceHud" class="panel" role="status" hidden></div>
+  <div id="vf" hidden>
+    <div class="vfFrame"><div class="vfInfo" id="vfInfo"></div></div>
+    <div class="vfTools">
+      <button class="btn panel" type="button" id="vfSelfie">Selfie <kbd>T</kbd></button>
+      <button id="vfShoot" type="button" aria-label="Take a photo (click or Space)"></button>
+      <button class="btn panel" type="button" id="vfAlbum">Album <kbd>I</kbd></button>
+      <button class="btn panel" type="button" id="vfClose">Put away <kbd>O</kbd></button>
+    </div>
+    <div id="vfFlash"></div>
+  </div>
+  <div id="album" class="panel" role="dialog" aria-labelledby="albumTitle" hidden>
+    <div class="albhead">
+      <span id="albumTitle">Photo album</span>
+      <span class="albtools"><span id="rollInfo"></span><button class="btn" type="button" id="newRoll">New roll</button><button class="btn" type="button" id="albumClose">Close <kbd>I</kbd></button></span>
+    </div>
+    <div id="albumGrid"></div>
+    <div id="albumEmpty">No photos yet. Press O to bring out the film camera, then click to take a picture of each other.</div>
+  </div>
+  <div id="photoView" role="dialog" aria-label="Photo" hidden>
+    <div class="pvwrap">
+      <figure><img id="pvImg" alt=""><figcaption id="pvCap"></figcaption></figure>
+      <div class="pvbar"><button class="btn panel" type="button" id="pvPrev" aria-label="Previous photo">‹</button><button class="btn panel" type="button" id="pvSave">Save</button><button class="btn panel" type="button" id="pvDel">Delete</button><button class="btn panel" type="button" id="pvClose">Close</button><button class="btn panel" type="button" id="pvNext" aria-label="Next photo">›</button></div>
+    </div>
+  </div>
   <button id="filmBtn" class="btn pulse" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>Watch animation</button>
   <div id="film" hidden>
     <div id="filmBubbles"></div>
@@ -182,6 +238,8 @@ body { font-family: var(--body); overflow: hidden; }
     <button class="btn" type="button" data-m="draw">Whiteboard <kbd>E</kbd></button>
     <button class="btn" type="button" data-m="kiss">Kiss <kbd>K</kbd></button>
     <button class="btn" type="button" data-m="race">Race <kbd>L</kbd></button>
+    <button class="btn" type="button" data-m="camera">Film camera <kbd>O</kbd></button>
+    <button class="btn" type="button" data-m="album">Photo album <kbd>I</kbd></button>
   </div>
   <div id="wb" class="panel" role="dialog" aria-labelledby="wbTitle" hidden>
     <div class="wbhead">
@@ -210,6 +268,7 @@ body { font-family: var(--body); overflow: hidden; }
       <button class="btn" type="button" id="holdBtn" aria-pressed="false" disabled title="Hold hands (G): stand close and both press it"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l4-4 3 1 2-2M21 13l-4-4-3 1-4 4a1.4 1.4 0 0 0 2 2l2-2 2 2M7 9l-2 7M17 9l2 7"/></svg><span class="tx" id="holdTx">Hold hands</span></button>
       <button class="btn" type="button" id="followBtn" aria-pressed="false" disabled title="Walk together: stay at their side"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="5" r="2"/><circle cx="16" cy="5" r="2"/><path d="M8 8v6l-2 7M8 14l2 7M16 8v6l-2 7M16 14l2 7M8 10h8"/></svg><span class="tx">Walk together</span></button>
       <button class="btn" type="button" id="fpBtn" aria-pressed="false" title="First-person view (P)"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-6.5 10-6.5S22 12 22 12s-3.5 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span class="tx">First person</span></button>
+      <button class="btn" type="button" id="camBtn" aria-pressed="false" title="Film camera (O): take pictures of each other"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7l1.5-3h5L16 7"/><circle cx="12" cy="13.5" r="3.5"/></svg><span class="tx">Camera</span></button>
       <button class="btn" type="button" id="voiceBtn" aria-pressed="false" title="Voice chat (M): people nearby hear you, louder the closer they are"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span class="tx">Voice</span></button>
       <button class="btn" type="button" id="soundBtn" aria-pressed="false" title="Wind and birdsong"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9h11a3 3 0 1 0-3-3M3 13h15a3 3 0 1 1-3 3M3 17h7"/></svg><span class="tx">Wind</span></button>
     </form>
@@ -763,7 +822,7 @@ movesBtn.onclick = () => { const open = movesMenu.hidden; movesMenu.hidden = !op
 movesMenu.addEventListener('click', (e) => {
   const b = e.target.closest('button[data-m]'); if (!b) return;
   const m = b.dataset.m;
-  if (m === 'kick') kickOrHit(); else if (m === 'ride') toggleRide(); else if (m === 'carry') togglePig('c'); else if (m === 'hopon') togglePig('r'); else if (m === 'draw') toggleBoard(); else if (m === 'kiss') kiss(); else if (m === 'race') startRace(); else setAct(m);
+  if (m === 'kick') kickOrHit(); else if (m === 'ride') toggleRide(); else if (m === 'carry') togglePig('c'); else if (m === 'hopon') togglePig('r'); else if (m === 'draw') toggleBoard(); else if (m === 'kiss') kiss(); else if (m === 'race') startRace(); else if (m === 'camera') setCamMode(camMode ? 0 : 1); else if (m === 'album') toggleAlbum(); else setAct(m);
 });
 
 // ---------- remote players ----------
@@ -796,6 +855,8 @@ function upsertRemote(peer) {
     }
   }
   r.vc = pr.vc === 1;
+  r.cam = pr.cam === 1 || pr.cam === 2 ? pr.cam : 0;
+  if (pr.snap && typeof pr.snap.id === 'string') remoteShot(r, pr.snap);
   { const sg = pr.rtc && myPeer ? pr.rtc[myPeer] : null; r.sig = sg && (sg.k === 'o' || sg.k === 'a') && typeof sg.n === 'string' && typeof sg.sdp === 'string' && sg.sdp.length < 20000 ? sg : null; }
   r.film = pr.film && Number.isFinite(pr.film.go) && (pr.film.tb === 0 || pr.film.tb === 1) ? { go: pr.film.go, tb: pr.film.tb } : null;
   r.race = pr.race && Number.isFinite(pr.race.go) ? { go: pr.race.go, fin: Number.isFinite(pr.race.fin) ? pr.race.fin : 0 } : null;
@@ -1026,6 +1087,293 @@ function kiss() {
   const r = remotes.get(id), both = r && r.kissTo === myPeer && performance.now() < (r.kissUntil || 0);
   spawnHearts(tmp.set((r.x + me.x) / 2, me.av.g.position.y + 1.5, (r.z + me.z) / 2).clone(), both ? 14 : 7);
 }
+// ---------- film camera: take pictures of each other ----------
+// O brings out a disposable film camera: a viewfinder (drag to look, scroll to zoom, T for a selfie at arm's length),
+// click or Space to shoot, 27 exposures to a roll. A shot is shared as a recipe, not pixels: where the camera stood and
+// looked, the time of day, and everyone in view with their pose (presence.snap, well under the room's 4 KiB). The
+// photographer and everyone in the frame each render it from that recipe with their own copy of the campus, then give
+// it the same film look (seeded grain, fade, vignette, a light leak now and then, the orange date stamp), so both of
+// you end up with the same picture. Photos are kept in this browser (IndexedDB) and can be saved as JPEGs.
+const ROLL = 27, RADI = Math.PI / 180;
+let camMode = 0, vfFov = 50, fpBefore = false, shootReady = 0, rollLeft = ROLL, flashT = 0, sfx = null, albumOpen = false, pvIndex = -1;
+try { const v = localStorage.getItem('hpaRoll'); if (v !== null) rollLeft = Math.max(0, Math.min(ROLL, parseInt(v, 10) || 0)); } catch (e) {}
+const photos = [], photoJobs = [], standIns = [], seenShots = new Set();
+const shotCam = new THREE.PerspectiveCamera(50, 1.5, 0.08, 30000);
+// a flash that lights the scene for a moment: in the picture, and for everyone near when someone shoots at night
+const flashLight = new THREE.PointLight(0xfff4e6, 0, 16, 2); scene.add(flashLight);
+const flashSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,250,235,0.8)'); gr.addColorStop(1, 'rgba(255,240,220,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); const tx = new THREE.CanvasTexture(cv); tx.encoding = THREE.sRGBEncoding; return tx; })(), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+flashSprite.visible = false; flashSprite.scale.set(1.2, 1.2, 1); scene.add(flashSprite);
+// a yellow disposable camera, held in the right hand
+const camPropMats = {};
+const cpm = (c, e) => camPropMats[c] || (camPropMats[c] = new THREE.MeshStandardMaterial({ color: C(c), roughness: 0.55, emissive: C(e || '#000000') }));
+function cameraProp() {
+  const g = new THREE.Group(), add = (geo, c, x, y, z, e) => { const m = new THREE.Mesh(geo, cpm(c, e)); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
+  add(new THREE.BoxGeometry(0.15, 0.085, 0.045), '#f2bf2a', 0, 0, 0);
+  add(new THREE.BoxGeometry(0.152, 0.036, 0.047), '#1f1f22', 0, -0.012, 0);
+  add(new THREE.CylinderGeometry(0.021, 0.024, 0.02, 16).rotateX(Math.PI / 2), '#2a2a2e', 0.03, -0.005, 0.03);
+  add(new THREE.CylinderGeometry(0.013, 0.013, 0.004, 14).rotateX(Math.PI / 2), '#5d7180', 0.03, -0.005, 0.041);
+  add(new THREE.BoxGeometry(0.034, 0.018, 0.004), '#eef2fa', -0.04, 0.026, 0.024, '#333333');
+  add(new THREE.BoxGeometry(0.02, 0.014, 0.006), '#1a1a1c', -0.04, 0.026, -0.024);
+  add(new THREE.CylinderGeometry(0.009, 0.009, 0.008, 10), '#c8322e', 0.05, 0.046, 0.006);
+  g.scale.setScalar(1.4);
+  return g;
+}
+// arms up to the eye for the viewfinder, or the right arm out for a selfie; the lens kept level, facing out or back
+const qArm = new THREE.Quaternion(), qBack = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
+function aimProp(a, mode) {
+  if (!a.camProp) {
+    a.camProp = cameraProp(); a.armR.add(a.camProp);
+    a.camProp.position.set(0, -(a.model ? MODELS[a.gender].rig.armLen : 0.55) * 0.95, 0.05);
+  }
+  a.camProp.visible = !!mode;
+  if (!mode) return;
+  qArm.setFromEuler(a.armR.rotation).invert();
+  a.camProp.quaternion.copy(qArm);
+  if (mode === 2) a.camProp.quaternion.multiply(qBack);
+}
+function holdCam(a, mode) {
+  if (mode === 1) { a.armL.rotation.x = a.armR.rotation.x = -2.05; a.armL.rotation.z = 0.55; a.armR.rotation.z = -0.55; }
+  else if (mode === 2) { a.armR.rotation.x = -1.65; a.armR.rotation.z = 0.3; }
+  if (mode || a.camProp) aimProp(a, mode);
+}
+function setCamMode(m) {
+  if (!entered || (m && film)) return;
+  closeMoves(); if (wbOpen >= 0) closeBoard(); if (m) closeAlbum();
+  if (m && !camMode) { fpBefore = firstPerson; if (!firstPerson) setFirstPerson(true); if (document.pointerLockElement) document.exitPointerLock(); }
+  if (!m && camMode && !fpBefore) setFirstPerson(false);
+  camMode = m;
+  camera.fov = m === 1 ? vfFov : m === 2 ? 70 : 55; camera.updateProjectionMatrix();
+  $('vf').hidden = !m; $('app').classList.toggle('cam', !!m); $('camBtn').setAttribute('aria-pressed', String(!!m));
+  $('vfSelfie').setAttribute('aria-pressed', String(m === 2));
+  updateVfInfo();
+  if (m) flash(m === 2 ? 'Selfie · drag to turn · click or Space to shoot · T for the viewfinder' : 'Drag to look · scroll to zoom · click or Space to shoot · T for a selfie');
+  if (room && entered) room.presence({ cam: m || null }).catch(() => {});
+}
+const flashOn = () => W.timeKey === 'night' || W.timeKey === 'sunset' || !!W.roomAt(me.x, me.z);
+function updateVfInfo() { $('vfInfo').textContent = String(rollLeft).padStart(2, '0') + ' EXP' + (flashOn() ? '  ⚡' : ''); }
+// the selfie camera: at arm's length in front of you, a little high, looking back at your face; with someone right
+// beside you it frames the two of you
+function selfieCam() {
+  const a = me.av, f = [Math.sin(me.ry), Math.cos(me.ry)];
+  if (a.head) a.head.getWorldPosition(fv); else fv.set(me.x, a.g.position.y + a.p.position.y + 1.45, me.z);
+  fv.y += a.model ? (MODELS[a.gender].rig.head.y1 - MODELS[a.gender].rig.neck) * 0.45 : 0.1;
+  let pal = null, pd = 1.8;
+  for (const r of remotes.values()) { const d = Math.hypot(r.x - me.x, r.z - me.z); if (d < pd) { pd = d; pal = r; } }
+  if (pal) { fv.x = (fv.x + pal.x) / 2; fv.z = (fv.z + pal.z) / 2; }
+  const back = pal ? 1.4 : 1.15;
+  camera.position.set(fv.x + f[0] * back, fv.y + 0.28 + Math.sin(fpPitch) * 0.6, fv.z + f[1] * back);
+  camera.lookAt(fv.x, fv.y - 0.1, fv.z);
+}
+function shoot() {
+  if (!camMode || film || !entered) return;
+  const now = performance.now();
+  if (now < shootReady) return;
+  if (rollLeft <= 0) { flash('The roll is finished · open the album (I) and load a new roll'); return; }
+  const R = makeRecipe();
+  rollLeft--; try { localStorage.setItem('hpaRoll', String(rollLeft)); } catch (e) {}
+  shootReady = now + 900; updateVfInfo();
+  shutterSound();
+  const fx = $('vfFlash'); fx.style.background = R.fl ? '#fff' : '#000'; fx.classList.remove('go'); void fx.offsetWidth; fx.classList.add('go');
+  if (R.fl) burst(R.p);
+  seenShots.add(R.id);
+  photoJobs.push({ R, by: nick || 'You', mine: true });
+  if (room && entered) room.presence({ snap: R }).catch(() => {});
+  flash('Click! ' + (ROLL - rollLeft) + ' of ' + ROLL + (R.to.length ? ' · they get a copy too' : '') + ' · developing…');
+}
+const r3 = (v) => Math.round(v * 1000) / 1000;
+function snapAv(a, skin, col, h) {
+  const P = [a.p.position.y, a.p.position.x, a.p.position.z, a.p.rotation.x, a.p.rotation.z, a.legL.rotation.x, a.legR.rotation.x, a.armL.rotation.x, a.armL.rotation.z, a.armR.rotation.x, a.armR.rotation.z,
+    a.spine ? a.spine.rotation.x : 0, a.spine ? a.spine.rotation.z : 0, a.head ? a.head.rotation.x : 0, a.head ? a.head.rotation.y : 0, a.head ? a.head.rotation.z : 0, a.skirt ? a.skirt.rotation.x : 0].map(r3);
+  return { g: a.gender, m: a.model ? 1 : 0, s: skin % 4, c: col, x: r3(a.g.position.x), y: r3(a.g.position.y), z: r3(a.g.position.z), r: r3(a.g.rotation.y), P, h: h || 0 };
+}
+function makeRecipe() {
+  camera.updateMatrixWorld();
+  const A = canvas.clientWidth / canvas.clientHeight, cp = camera.position;
+  const v = A >= 1.5 ? camera.fov : 2 * Math.atan(Math.tan(camera.fov * RADI / 2) * A / 1.5) / RADI;
+  const av = [], to = [], cart = [];
+  // who is in the 3:2 frame gets a copy
+  const inFrame = (a) => { fv.set(a.g.position.x, a.g.position.y + 1.3, a.g.position.z); if (fv.distanceTo(cp) > 45) return false; fv.project(camera); return fv.z < 1 && Math.abs(fv.x) <= Math.min(1, 1.5 / A) && Math.abs(fv.y) <= Math.min(1, A / 1.5); };
+  for (const r of remotes.values()) {
+    if (av.length >= 10 || Math.hypot(r.x - cp.x, r.z - cp.z) > 90) continue;
+    av.push(snapAv(r.av, r.skin, r.color, r.cam));
+    if (inFrame(r.av)) to.push(r.id);
+  }
+  if (camMode === 2) av.push(Object.assign(snapAv(me.av, skinIdx, color, 2), { me: 1 }));
+  for (const c of W.carts) if (Math.hypot(c.x - cp.x, c.z - cp.z) < 90) cart.push([c.id, r3(c.x), r3(c.z), r3(c.ry)]);
+  return { id: Math.random().toString(36).slice(2, 10), at: Date.now(), by: safeText(nick, 16), tk: W.timeKey, fl: flashOn() ? 1 : 0,
+    p: [r3(cp.x), r3(cp.y), r3(cp.z)], q: camera.quaternion.toArray().map(r3), v: r3(v), av, cart, to };
+}
+// a recipe from someone else: numbers must be numbers, lists short, colours colours
+function cleanRecipe(sn) {
+  const num = (v) => typeof v === 'number' && Number.isFinite(v);
+  if (!sn || typeof sn.id !== 'string' || sn.id.length > 12 || !num(sn.at) || !W.times[sn.tk] || !num(sn.v) || sn.v < 5 || sn.v > 120) return null;
+  if (!Array.isArray(sn.p) || sn.p.length !== 3 || !sn.p.every(num) || !Array.isArray(sn.q) || sn.q.length !== 4 || !sn.q.every(num)) return null;
+  const av = (Array.isArray(sn.av) ? sn.av : []).slice(0, 10).filter((a) => a && (a.g === 'm' || a.g === 'f') && ['x', 'y', 'z', 'r'].every((k) => num(a[k])) && Array.isArray(a.P) && a.P.length === 17 && a.P.every(num))
+    .map((a) => ({ g: a.g, m: a.m ? 1 : 0, s: num(a.s) ? Math.abs(a.s | 0) % 4 : 0, c: safeColor(a.c), x: a.x, y: a.y, z: a.z, r: a.r, P: a.P, h: a.h === 1 || a.h === 2 ? a.h : 0, me: a.me ? 1 : 0 }));
+  const cart = (Array.isArray(sn.cart) ? sn.cart : []).slice(0, 12).filter((c) => Array.isArray(c) && c.length === 4 && cartById.has(c[0]) && c.slice(1).every(num));
+  return { id: sn.id, at: sn.at, by: safeText(sn.by, 16), tk: sn.tk, fl: sn.fl ? 1 : 0, p: sn.p, q: sn.q, v: sn.v, av, cart, to: Array.isArray(sn.to) ? sn.to.filter((x) => typeof x === 'string').slice(0, 10) : [] };
+}
+// someone else's shot: their flash goes off; if you were in the frame, your copy starts developing
+function remoteShot(r, sn) {
+  if (seenShots.has(sn.id)) return;
+  seenShots.add(sn.id);
+  if (Math.abs(Date.now() - sn.at) > 15000) return;
+  const R = cleanRecipe(sn); if (!R) return;
+  if (R.fl && Math.hypot(r.x - me.x, r.z - me.z) < 70) burst(R.p);
+  if (myPeer && R.to.includes(myPeer)) {
+    photoJobs.push({ R, by: R.by || r.nick, mine: false });
+    flash('📸 ' + (R.by || r.nick) + ' took a picture of you · I to see it');
+  }
+}
+function burst(p) { flashLight.position.set(p[0], p[1], p[2]); flashLight.intensity = 2.6; flashSprite.position.set(p[0], p[1], p[2]); flashSprite.visible = true; flashT = performance.now() + 130; }
+function shutterSound() {
+  try { sfx = sfx || new (window.AudioContext || window.webkitAudioContext)(); sfx.resume(); } catch (e) { return; }
+  const t0 = sfx.currentTime + 0.01;
+  const tick = (at, dur, vol, f) => {
+    const len = Math.ceil(sfx.sampleRate * dur), b = sfx.createBuffer(1, len, sfx.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3);
+    const src = sfx.createBufferSource(), bp = sfx.createBiquadFilter(), g = sfx.createGain();
+    src.buffer = b; bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 0.9; g.gain.value = vol;
+    src.connect(bp); bp.connect(g); g.connect(sfx.destination); src.start(at);
+  };
+  tick(t0, 0.03, 0.9, 2300); tick(t0 + 0.06, 0.025, 0.55, 1700); // the shutter
+  for (let i = 0; i < 9; i++) tick(t0 + 0.38 + i * 0.055, 0.016, 0.3, 3300 - i * 70); // thumb wheel winding on
+}
+// pose a stand-in avatar exactly as the recipe saw someone
+function poseStandIn(i, s) {
+  const want = s.g + (s.m && MODELS[s.g].geo ? 'm' : 'h') + s.s;
+  let a = standIns[i];
+  if (!a || a.key !== want) { if (a) scene.remove(a.g); a = makeAvatar(s.c, s.s, s.g); a.key = want; standIns[i] = a; }
+  a.lei.color.copy(C(s.c));
+  a.g.position.set(s.x, s.y, s.z); a.g.rotation.y = s.r;
+  const P = s.P;
+  a.p.position.set(P[1], P[0], P[2]); a.p.rotation.x = P[3]; a.p.rotation.z = P[4];
+  a.legL.rotation.x = P[5]; a.legR.rotation.x = P[6]; a.armL.rotation.x = P[7]; a.armL.rotation.z = P[8]; a.armR.rotation.x = P[9]; a.armR.rotation.z = P[10];
+  if (a.spine) { a.spine.rotation.x = P[11]; a.spine.rotation.z = P[12]; a.head.rotation.set(P[13], P[14], P[15]); }
+  if (a.skirt) a.skirt.rotation.x = P[16];
+  a.racket.visible = false;
+  aimProp(a, s.me ? 0 : s.h);
+  a.g.visible = true;
+  return a;
+}
+// render one recipe into the canvas (inside the frame, before the real view is drawn) and copy it out
+function renderShot(R) {
+  const cv = renderer.domElement, cw = cv.width, ch = cv.height, A = cw / ch;
+  const live = [me.av.g, ...[...remotes.values()].map((r) => r.av.g)], was = live.map((g) => g.visible);
+  live.forEach((g) => { g.visible = false; });
+  const used = R.av.map((sa, i) => poseStandIn(i, sa));
+  const tk0 = W.timeKey; if (R.tk !== tk0) W.setTime(R.tk);
+  const cartWas = R.cart.map(([id, x, z, ry]) => { const c = cartById.get(id), w = [c, c.x, c.z, c.ry]; W.placeCart(c, x, z, ry); return w; });
+  shotCam.position.set(R.p[0], R.p[1], R.p[2]); shotCam.quaternion.set(R.q[0], R.q[1], R.q[2], R.q[3]);
+  shotCam.aspect = A; shotCam.fov = A >= 1.5 ? R.v : 2 * Math.atan(Math.tan(R.v * RADI / 2) * 1.5 / A) / RADI;
+  shotCam.updateProjectionMatrix(); shotCam.updateMatrixWorld();
+  if (R.fl) { flashLight.position.copy(shotCam.position); flashLight.intensity = 2.6; }
+  W.update(0, t, fv.copy(shotCam.position));
+  flashSprite.visible = false;
+  renderer.render(scene, shotCam);
+  const url = cv.toDataURL('image/jpeg', 0.95);
+  flashLight.intensity = 0;
+  used.forEach((a) => { a.g.visible = false; });
+  live.forEach((g, i) => { g.visible = was[i]; });
+  if (R.tk !== tk0) W.setTime(tk0);
+  cartWas.forEach(([c, x, z, ry]) => W.placeCart(c, x, z, ry));
+  W.update(0, t, me.av.g.position);
+  const w = A >= 1.5 ? ch * 1.5 : cw, h = A >= 1.5 ? ch : cw / 1.5;
+  return { url, crop: { x: (cw - w) / 2, y: (ch - h) / 2, w, h } };
+}
+const loadImg = (url) => new Promise((ok, no) => { const im = new Image(); im.onload = () => ok(im); im.onerror = no; im.src = url; });
+// the film look, seeded by the shot so everyone's print matches: soft, warm, faded blacks, grain, vignette,
+// sometimes a light leak, and the date burned into the corner in Hawaiʻi time
+async function filmLook(url, crop, R) {
+  const im = await loadImg(url), Wp = 1200, Hp = 800, cv = document.createElement('canvas'); cv.width = Wp; cv.height = Hp;
+  const g = cv.getContext('2d');
+  g.filter = 'blur(0.5px) saturate(1.06) contrast(1.03)';
+  g.drawImage(im, crop.x, crop.y, crop.w, crop.h, 0, 0, Wp, Hp);
+  g.filter = 'none';
+  let seed = 0; for (const ch of R.id) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+  const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+  const img = g.getImageData(0, 0, Wp, Hp), d = img.data;
+  for (let y = 0; y < Hp; y++) {
+    const dy = y / Hp - 0.5;
+    for (let x = 0; x < Wp; x++) {
+      const i = (y * Wp + x) * 4, dx = x / Wp - 0.5, vig = 1 - 0.62 * Math.pow(dx * dx * 1.1 + dy * dy * 1.7, 1.15), n = (rnd() - 0.5) * 26;
+      d[i] = (d[i] * 1.02 + 12) * vig + n; d[i + 1] = (d[i + 1] * 0.98 + 10) * vig + n; d[i + 2] = (d[i + 2] * 0.88 + 16) * vig + n;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  if (rnd() < 0.45) {
+    const left = rnd() < 0.5, cx = left ? -60 : Wp + 60, cy = Hp * (0.2 + rnd() * 0.6), gr = g.createRadialGradient(cx, cy, 0, cx, cy, Hp * (0.5 + rnd() * 0.3));
+    gr.addColorStop(0, 'rgba(255,110,40,0.55)'); gr.addColorStop(0.5, 'rgba(255,150,60,0.18)'); gr.addColorStop(1, 'rgba(255,170,80,0)');
+    g.globalCompositeOperation = 'screen'; g.fillStyle = gr; g.fillRect(0, 0, Wp, Hp); g.globalCompositeOperation = 'source-over';
+  }
+  const dt = new Date(R.at - 10 * 3600e3), stamp = "'" + String(dt.getUTCFullYear() % 100).padStart(2, '0') + ' ' + String(dt.getUTCMonth() + 1).padStart(2, '0') + ' ' + String(dt.getUTCDate()).padStart(2, '0');
+  g.font = 'bold 34px "Courier New", monospace'; g.textAlign = 'right'; g.textBaseline = 'alphabetic';
+  g.shadowColor = 'rgba(255,80,10,0.9)'; g.shadowBlur = 8; g.fillStyle = 'rgba(255,146,64,0.92)'; g.fillText(stamp, Wp - 46, Hp - 40);
+  return cv.toDataURL('image/jpeg', 0.88);
+}
+function developNext() {
+  const job = photoJobs.shift();
+  let shot; try { shot = renderShot(job.R); } catch (e) { return; }
+  filmLook(shot.url, shot.crop, job.R).then((url) => {
+    if (photos.some((ph) => ph.id === job.R.id)) return;
+    const ph = { id: job.R.id, at: job.R.at, by: job.by, tk: job.R.tk, mine: job.mine, url, fresh: true };
+    photos.unshift(ph); photoDb.put(ph);
+    if (albumOpen) renderAlbum();
+  }).catch(() => {});
+}
+// kept in this browser; nothing here leaves it unless you save a photo
+const photoDb = (() => {
+  let op = null;
+  const open = () => op || (op = new Promise((ok, no) => { const rq = indexedDB.open('hpa-photos', 1); rq.onupgradeneeded = () => rq.result.createObjectStore('p', { keyPath: 'id' }); rq.onsuccess = () => ok(rq.result); rq.onerror = () => no(rq.error); }));
+  const run = async (mode, fn) => { try { const db = await open(); return await new Promise((ok) => { const tx = db.transaction('p', mode), r = fn(tx.objectStore('p')); tx.oncomplete = () => ok(r && r.result); tx.onerror = () => ok(null); }); } catch (e) { return null; } };
+  return { all: () => run('readonly', (st) => st.getAll()), put: (ph) => run('readwrite', (st) => st.put({ id: ph.id, at: ph.at, by: ph.by, tk: ph.tk, mine: ph.mine, url: ph.url })), del: (id) => run('readwrite', (st) => st.delete(id)) };
+})();
+photoDb.all().then((list) => { if (Array.isArray(list)) { for (const ph of list) if (!photos.some((x) => x.id === ph.id)) photos.push(ph); photos.sort((a, b) => b.at - a.at); } });
+// ---------- album ----------
+const fmtWhen = (at) => { const d = new Date(at - 10 * 3600e3); return d.toISOString().slice(0, 10) + ' ' + d.toISOString().slice(11, 16); };
+function renderAlbum() {
+  const grid = $('albumGrid'); grid.textContent = '';
+  photos.forEach((ph, i) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ph' + (ph.fresh ? ' dev' : ''); b.style.setProperty('--r', ((ph.id.charCodeAt(0) % 7) - 3) * 0.6 + 'deg');
+    const im = document.createElement('img'); im.src = ph.url; im.alt = 'Photo by ' + ph.by + ', ' + fmtWhen(ph.at); im.loading = 'lazy';
+    const cap = document.createElement('small'); cap.textContent = (ph.mine ? 'You' : ph.by) + ' · ' + fmtWhen(ph.at).slice(5);
+    b.append(im, cap); b.onclick = () => openPhoto(i); grid.append(b);
+    ph.fresh = false;
+  });
+  $('albumEmpty').hidden = photos.length > 0;
+  $('rollInfo').textContent = rollLeft + ' of ' + ROLL + ' left on this roll';
+}
+function toggleAlbum() { if (albumOpen) closeAlbum(); else { if (camMode) setCamMode(0); closeMoves(); albumOpen = true; $('album').hidden = false; renderAlbum(); } }
+function closeAlbum() { albumOpen = false; $('album').hidden = true; closePhoto(); }
+function openPhoto(i) {
+  const ph = photos[i]; if (!ph) return;
+  pvIndex = i; $('photoView').hidden = false; $('pvImg').src = ph.url; $('pvImg').alt = 'Photo by ' + ph.by;
+  $('pvCap').textContent = '📸 ' + (ph.mine ? 'You' : ph.by) + ' · ' + fmtWhen(ph.at) + ' Hawaiʻi time · ' + (W.times[ph.tk] ? W.times[ph.tk].label : '');
+  $('pvPrev').disabled = i <= 0; $('pvNext').disabled = i >= photos.length - 1;
+}
+function closePhoto() { pvIndex = -1; $('photoView').hidden = true; }
+async function savePhoto(ph) {
+  const name = 'hpa-' + fmtWhen(ph.at).replace(/[ :]/g, '-') + '.jpg';
+  try {
+    const dl = window.claude && window.claude.use ? await window.claude.use('downloads') : null;
+    if (dl) { await dl.save({ filename: name, data: await (await fetch(ph.url)).blob() }); return; }
+  } catch (e) { if (e && e.code === 'declined') return; }
+  const a = document.createElement('a'); a.href = ph.url; a.download = name; document.body.append(a); a.click(); a.remove();
+  flash('Saved · if nothing downloaded, right-click the photo and save it');
+}
+$('camBtn').onclick = () => setCamMode(camMode ? 0 : 1);
+$('vfShoot').onclick = () => shoot();
+$('vfSelfie').onclick = () => setCamMode(camMode === 2 ? 1 : 2);
+$('vfAlbum').onclick = () => toggleAlbum();
+$('vfClose').onclick = () => setCamMode(0);
+$('albumClose').onclick = () => closeAlbum();
+$('newRoll').onclick = () => { rollLeft = ROLL; try { localStorage.setItem('hpaRoll', String(ROLL)); } catch (e) {} renderAlbum(); flash('A new roll of ' + ROLL + ' is loaded'); };
+$('pvClose').onclick = () => closePhoto();
+$('pvPrev').onclick = () => openPhoto(pvIndex - 1);
+$('pvNext').onclick = () => openPhoto(pvIndex + 1);
+$('pvSave').onclick = () => { if (photos[pvIndex]) savePhoto(photos[pvIndex]); };
+$('pvDel').onclick = () => { const ph = photos[pvIndex]; if (!ph) return; photos.splice(pvIndex, 1); photoDb.del(ph.id); closePhoto(); renderAlbum(); };
+
 // ---------- voice chat: talk to people nearby, louder the closer they are ----------
 // Microphones connect straight between browsers (WebRTC). The offer and the answer travel through the room as a
 // short-lived `rtc` entry on the sender's own peer record, addressed by peer id (room.signal), and are cleared once
@@ -1224,7 +1572,7 @@ function filmActor(kind, leiColor) {
 }
 function startFilm(go, tb, mine) {
   if (film || !MODELS.m.geo || !MODELS.f.geo) return;
-  closeMoves(); if (wbOpen >= 0) closeBoard(); if (firstPerson) setFirstPerson(false);
+  closeMoves(); if (wbOpen >= 0) closeBoard(); if (camMode) setCamMode(0); closeAlbum(); if (firstPerson) setFirstPerson(false);
   filmSeen = go;
   const [tx, tz] = W.nook.tables[tb];
   const st0 = W.seats.find((st) => nookTable(st.id) === tb), seatY = st0 ? st0.y : groundH(tx, tz) + 0.56;
@@ -1760,6 +2108,20 @@ const typing = () => document.activeElement && (document.activeElement.tagName =
 addEventListener('keydown', (e) => {
   if (typing()) return;
   if (film) { if (e.code === 'Escape') endFilm(); if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); return; }
+  if (albumOpen) {
+    if (e.code === 'KeyI' || e.code === 'Escape') { e.preventDefault(); if (pvIndex >= 0 && e.code === 'Escape') closePhoto(); else closeAlbum(); }
+    else if (pvIndex >= 0 && e.code === 'ArrowLeft') openPhoto(pvIndex - 1);
+    else if (pvIndex >= 0 && e.code === 'ArrowRight') openPhoto(pvIndex + 1);
+    return;
+  }
+  if (camMode && !e.repeat) {
+    if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); shoot(); return; }
+    if (e.code === 'KeyT') { setCamMode(camMode === 2 ? 1 : 2); return; }
+    if (e.code === 'KeyO' || e.code === 'Escape') { setCamMode(0); return; }
+    if (e.code === 'KeyP') return;
+  }
+  if (e.code === 'KeyO' && entered && !e.repeat) { setCamMode(1); return; }
+  if (e.code === 'KeyI' && entered && !e.repeat) { toggleAlbum(); return; }
   if (wbOpen >= 0) { if (e.code === 'KeyE' || e.code === 'Escape') { e.preventDefault(); closeBoard(); } return; }
   if (e.code === 'KeyE' && entered && !e.repeat) { toggleBoard(); return; }
   if (e.code === 'KeyK' && entered && !e.repeat) { kiss(); return; }
@@ -1786,11 +2148,11 @@ addEventListener('blur', () => keys.clear());
 
 let drag = null;
 canvas.addEventListener('pointerdown', (e) => {
-  if (firstPerson && e.pointerType === 'mouse') { try { const r = canvas.requestPointerLock && canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) {} return; }
-  drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId);
+  if (firstPerson && !camMode && e.pointerType === 'mouse') { try { const r = canvas.requestPointerLock && canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) {} return; }
+  drag = { id: e.pointerId, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now() }; canvas.setPointerCapture(e.pointerId);
 });
 canvas.addEventListener('pointermove', (e) => {
-  if (firstPerson && e.pointerType === 'mouse') {
+  if (firstPerson && !camMode && e.pointerType === 'mouse') {
     camYaw -= e.movementX * 0.0035; fpPitch = Math.max(-1.3, Math.min(1.3, fpPitch - e.movementY * 0.0035));
     return;
   }
@@ -1800,10 +2162,16 @@ canvas.addEventListener('pointermove', (e) => {
   else camPitch = Math.max(0.04, Math.min(1.3, camPitch + (e.clientY - drag.y) * 0.004));
   drag.x = e.clientX; drag.y = e.clientY;
 });
-const endDrag = (e) => { if (drag && drag.id === e.pointerId) drag = null; };
+const endDrag = (e) => {
+  if (!drag || drag.id !== e.pointerId) return;
+  if (camMode && e.type === 'pointerup' && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6 && performance.now() - drag.t0 < 450) shoot();
+  drag = null;
+};
 canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
 canvas.addEventListener('wheel', (e) => {
   e.preventDefault();
+  if (camMode === 1) { vfFov = Math.max(26, Math.min(72, vfFov * (1 + Math.sign(e.deltaY) * 0.08))); camera.fov = vfFov; camera.updateProjectionMatrix(); return; }
+  if (camMode) return;
   if (firstPerson) { if (e.deltaY > 0) setFirstPerson(false); return; }
   if (e.deltaY < 0 && camDist <= 2.5) { setFirstPerson(true); return; }
   camDist = Math.max(2.5, Math.min(30, camDist * (1 + Math.sign(e.deltaY) * 0.1)));
@@ -1942,6 +2310,8 @@ function frame() {
   if (swimming && me.act) standUp();
   animateAvatar(me.av, me.speed, dt, riding ? 'piggy' : carrying ? 'carry' : kissing ? 'kiss' : swimming ? (me.speed > 0.3 ? 'swim' : 'tread') : me.act, me.lift);
   if (partner) reachArm(me.av, me.ry, me.x, me.z, partner.x, partner.z);
+  holdCam(me.av, camMode);
+  if (camMode === 2) me.av.camProp.visible = false;
   stepBall(dt);
   stepTennis(dt);
   me.av.racket.visible = TN.inside(me.x, me.z);
@@ -1968,6 +2338,7 @@ function frame() {
     const rSwim = !r.ride && W.inPool(r.x, r.z);
     animateAvatar(r.av, r.speed, dt, r.ride ? (r.ride.s === 0 ? 'drive' : 'ride') : rp ? (rp.role === 'r' ? 'piggy' : 'carry') : performance.now() < (r.kissUntil || 0) ? 'kiss' : rSwim ? (r.speed > 0.3 ? 'swim' : 'tread') : r.act, lift);
     r.av.racket.visible = TN.inside(r.x, r.z);
+    holdCam(r.av, r.cam);
     if (partner && r === partner) reachArm(r.av, r.ry, r.x, r.z, me.x, me.z);
     if (Math.hypot(r.x - me.x, r.z - me.z) < 1.7 && now > nearHeartT) {
       nearHeartT = now + 2600;
@@ -1993,8 +2364,9 @@ function frame() {
   }
 
   // camera
-  me.av.g.visible = !firstPerson;
+  me.av.g.visible = !firstPerson || camMode === 2;
   if (film) stepFilm(dt);
+  else if (camMode === 2) selfieCam();
   else if (firstPerson) {
     const eyeY = me.av.g.position.y + me.av.p.position.y + (me.act === 'lie' ? 0.32 : 1.62);
     const dx = -Math.sin(camYaw), dz = -Math.cos(camYaw), cp = Math.cos(fpPitch);
@@ -2015,6 +2387,8 @@ function frame() {
   }
   if (!entered) camYaw += dt * 0.04;
 
+  if (flashT && now > flashT) { flashT = 0; flashLight.intensity = 0; flashSprite.visible = false; }
+  if (photoJobs.length && !film) developNext();
   renderer.render(scene, camera);
   // step quality down if the frame rate stays low
   if (now > 6000) { perfAcc += dt; perfN++; if (perfAcc > 4) { if (perfAcc / perfN > 0.034 && quality > 0) quality = W.setQuality(quality - 1); perfAcc = 0; perfN = 0; } }
