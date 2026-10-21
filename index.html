@@ -135,7 +135,7 @@ body { font-family: var(--body); overflow: hidden; }
     <div id="peers" class="panel" aria-live="polite"></div>
   </header>
 
-  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · P first person · H heart · G hold hands · B carry on your back · N hop on their back · E whiteboard · Enter talk</div>
+  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · P first person · H heart · G hold hands · B carry on your back · N hop on their back · E whiteboard · K kiss · Enter talk</div>
   <div id="ctx" class="panel" role="status" hidden></div>
   <div id="goal" hidden>Goal!</div>
   <div id="moves" class="panel menu" hidden>
@@ -148,6 +148,7 @@ body { font-family: var(--body); overflow: hidden; }
     <button class="btn" type="button" data-m="carry">Carry on back <kbd>B</kbd></button>
     <button class="btn" type="button" data-m="hopon">Hop on back <kbd>N</kbd></button>
     <button class="btn" type="button" data-m="draw">Whiteboard <kbd>E</kbd></button>
+    <button class="btn" type="button" data-m="kiss">Kiss <kbd>K</kbd></button>
   </div>
   <div id="wb" class="panel" role="dialog" aria-labelledby="wbTitle" hidden>
     <div class="wbhead">
@@ -190,8 +191,8 @@ body { font-family: var(--body); overflow: hidden; }
       <div class="field">
         <label id="genderLbl">I am</label>
         <div class="seg" id="gender" role="radiogroup" aria-labelledby="genderLbl">
-          <button type="button" class="segb" role="radio" data-g="m" aria-checked="true">Man</button>
-          <button type="button" class="segb" role="radio" data-g="f" aria-checked="false">Woman</button>
+          <button type="button" class="segb" role="radio" data-g="m" aria-checked="true">Jiho</button>
+          <button type="button" class="segb" role="radio" data-g="f" aria-checked="false">Isa</button>
         </div>
       </div>
       <div class="field">
@@ -208,6 +209,7 @@ body { font-family: var(--body); overflow: hidden; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="world.js?v=17"></script>
 <script>
 (() => {
@@ -253,7 +255,70 @@ const floralTex = (() => {
   }
   const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); return t;
 })();
+// ---------- Jiho and Isa: photo-based models made in Tripo, given a simple skeleton here ----------
+// The meshes come unrigged, standing in an A-pose. The joints below were measured by slicing each model by height
+// (where the legs part, where the arms leave the body, how low the hands hang), as fractions of its height [x, y];
+// every vertex is then tied to the hips, a leg or an arm, so the same poses as the hand-built avatars move them.
+const MODELS = {
+  m: { url: 'models/jiho.glb', H: 1.75, joints: { hip: [0.075, 0.3], sh: [0.12, 0.56], hand: [0.2, 0.34] } },
+  f: { url: 'models/isa.glb', H: 1.62, joints: { hip: [0.06, 0.27], sh: [0.13, 0.54], hand: [0.205, 0.36] } },
+};
+function prepareModel(kind, gltf) {
+  const M = MODELS[kind];
+  let src = null;
+  gltf.scene.updateMatrixWorld(true);
+  gltf.scene.traverse((o) => { if (o.isMesh && !src) src = o; });
+  if (!src) return false;
+  const geo = src.geometry.clone(); geo.applyMatrix4(src.matrixWorld); geo.computeBoundingBox();
+  const bb = geo.boundingBox, H = M.H, sc = H / (bb.max.y - bb.min.y);
+  geo.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2); geo.scale(sc, sc, sc);
+  if (!geo.attributes.normal) geo.computeVertexNormals();
+  const pos = geo.attributes.position, n = pos.count, J = M.joints, at = ([x, y]) => ({ x: x * H, y: y * H });
+  const hip = at(J.hip), hand = at(J.hand);
+  const sh = at(J.sh), ex = hand.x - sh.x, ey = hand.y - sh.y, L2 = ex * ex + ey * ey;
+  // bones: 0 hips, 1 left leg, 2 right leg, 3 left arm, 4 right arm (left is -x, as on the other avatars)
+  const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    const x = pos.getX(i), y = pos.getY(i), ax = Math.abs(x), L = x < 0;
+    const t = Math.max(0, Math.min(1, ((ax - sh.x) * ex + (y - sh.y) * ey) / L2)), px = sh.x + t * ex, py = sh.y + t * ey;
+    const onArm = ax > px - 0.035 * H && Math.hypot(ax - px, y - py) < 0.065 * H && y < sh.y + 0.05 * H && y > hand.y - 0.08 * H;
+    let bone = 0, w = 0;
+    if (onArm) { bone = L ? 3 : 4; w = Math.min(1, t * 3.5); }
+    else if (y < hip.y + 0.03 * H && ax < 0.15 * H) { bone = L ? 1 : 2; w = Math.min(1, Math.max(0, (hip.y + 0.03 * H - y) / (0.07 * H))); }
+    si[i * 4] = bone; sw[i * 4] = w; si[i * 4 + 1] = 0; sw[i * 4 + 1] = 1 - w;
+  }
+  geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+  geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+  const mat = src.material.clone(); mat.skinning = true;
+  Object.assign(M, { geo, mat, rig: { sh, hip, theta: Math.atan2(hand.x - sh.x, sh.y - hand.y), armLen: Math.sqrt(L2) } });
+  return true;
+}
+function makeModelAvatar(kind, leiColor) {
+  const M = MODELS[kind], H = M.H, r = M.rig;
+  const g = new THREE.Group(), p = new THREE.Group(); g.add(p);
+  const root = new THREE.Bone();
+  const joint = (x, y, rz) => { const b = new THREE.Bone(); b.position.set(x, y, 0); b.rotation.z = rz; root.add(b); return b; };
+  // the arms rest at the A-pose angle, so the pose code's "arm hanging straight down" turns them in
+  const legL = joint(-r.hip.x, r.hip.y, 0), legR = joint(r.hip.x, r.hip.y, 0), armL = joint(-r.sh.x, r.sh.y, -r.theta), armR = joint(r.sh.x, r.sh.y, r.theta);
+  const mesh = new THREE.SkinnedMesh(M.geo, M.mat);
+  mesh.add(root); mesh.updateMatrixWorld(true); mesh.bind(new THREE.Skeleton([root, legL, legR, armL, armR]));
+  mesh.castShadow = true; mesh.frustumCulled = false; p.add(mesh);
+  // a lei in the chosen colour, round the neck just above the shoulders
+  const lei = new THREE.MeshStandardMaterial({ color: C(leiColor), roughness: 0.8 }), ny = r.sh.y / H + 0.08;
+  const curve = new THREE.CatmullRomCurve3([[-0.075, ny + 0.03, 0.02], [-0.075, ny - 0.005, 0.07], [0, ny - 0.035, 0.11], [0.075, ny - 0.005, 0.07], [0.075, ny + 0.03, 0.02], [0, ny + 0.04, -0.07]].map(([x, y, z]) => new THREE.Vector3(x * H, y * H, z * H)), true);
+  const leiMesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.022, 6, true), lei); leiMesh.castShadow = true; p.add(leiMesh);
+  const racket = new THREE.Group(); racket.position.set(0, -r.armLen, 0.03); racket.visible = false; armR.add(racket);
+  add3(racket, new THREE.CylinderGeometry(0.016, 0.016, 0.3, 8), new THREE.MeshStandardMaterial({ color: 0x222226, roughness: 0.5 }), 0, -0.12, 0);
+  const rh = add3(racket, new THREE.TorusGeometry(0.13, 0.013, 6, 24), new THREE.MeshStandardMaterial({ color: 0x2f6fd0, roughness: 0.4 }), 0, -0.4, 0); rh.scale.y = 1.25;
+  const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.4, 16), new THREE.MeshBasicMaterial({ color: 0x23301c, transparent: true, opacity: 0.12, depthWrite: false }));
+  shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.08; g.add(shadow);
+  scene.add(g);
+  return { g, p, lei, legL, legR, armL, armR, skirt: null, racket, phase: 0, t: Math.random() * 10, kickUntil: 0, swingUntil: 0, gender: kind, hipAdj: 0.7 - r.hip.y, model: true };
+}
+function add3(parent, geo, mat, x, y, z) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; }
 function makeAvatar(leiColor, skinIdx, gender) {
+  const kind = gender === 'f' ? 'f' : 'm';
+  if (MODELS[kind].geo) return makeModelAvatar(kind, leiColor);
   const fem = gender === 'f';
   const g = new THREE.Group(), p = new THREE.Group(); g.add(p);
   const std = (c, r, extra) => new THREE.MeshStandardMaterial(Object.assign({ color: C(c), roughness: r }, extra || {}));
@@ -322,7 +387,7 @@ function animateAvatar(a, speed, dt, act, lift) {
   const T = { py: 0, px: 0, pz: 0, rx: 0, rz: 0, lL: 0, lR: 0, aLx: 0, aRx: 0, aLz: -0.12, aRz: 0.12, sk: 0 };
   if (act === 'sit' || act === 'drive' || act === 'ride') {
     const seated = lift != null;
-    T.py = (seated ? lift : 0.1) - 0.68;
+    T.py = (seated ? lift : 0.1) - 0.68 + (a.hipAdj || 0);
     T.lL = T.lR = seated ? -1.4 : -1.5;
     T.sk = -1.2;
     if (act === 'drive') { T.aLx = T.aRx = -1.05; T.aLz = -0.05; T.aRz = 0.05; }
@@ -348,6 +413,9 @@ function animateAvatar(a, speed, dt, act, lift) {
     if (mv > 0.05) a.phase += dt * (4 + speed * 2.2);
     const s = Math.sin(a.phase) * 0.5 * mv;
     T.lL = s; T.lR = -s; T.rx = 0.22; T.aLx = T.aRx = 0.75; T.aLz = -0.35; T.aRz = 0.35;
+  } else if (act === 'kiss') {
+    // lean in with arms round them; the shorter one goes up on tiptoe
+    T.rx = 0.16; T.aLx = T.aRx = -0.85; T.aLz = 0.5; T.aRz = -0.5; T.py = a.gender === 'f' ? 0.05 : 0;
   } else if (act === 'piggy') {
     // up on someone's back: legs round their waist, arms round their shoulders
     T.py = 0.6; T.rx = 0.2; T.lL = T.lR = -1.25; T.sk = -1.0; T.aLx = T.aRx = -1.35; T.aLz = 0.45; T.aRz = -0.45;
@@ -630,7 +698,7 @@ movesBtn.onclick = () => { const open = movesMenu.hidden; movesMenu.hidden = !op
 movesMenu.addEventListener('click', (e) => {
   const b = e.target.closest('button[data-m]'); if (!b) return;
   const m = b.dataset.m;
-  if (m === 'kick') kickOrHit(); else if (m === 'ride') toggleRide(); else if (m === 'carry') togglePig('c'); else if (m === 'hopon') togglePig('r'); else if (m === 'draw') toggleBoard(); else setAct(m);
+  if (m === 'kick') kickOrHit(); else if (m === 'ride') toggleRide(); else if (m === 'carry') togglePig('c'); else if (m === 'hopon') togglePig('r'); else if (m === 'draw') toggleBoard(); else if (m === 'kiss') kiss(); else setAct(m);
 });
 
 // ---------- remote players ----------
@@ -655,6 +723,13 @@ function upsertRemote(peer) {
   r.hold = typeof pr.hold === 'string' ? pr.hold : null;
   const wbKey = JSON.stringify(pr.wb || null);
   if (wbKey !== r.wbKey) { const was = new Set((r.wb || []).map((st) => st.b)); r.wbKey = wbKey; r.wb = parseWb(pr.wb); for (const st of r.wb) was.add(st.b); for (const i of was) renderBoard(i); }
+  if (pr.kiss && typeof pr.kiss.to === 'string' && Number.isFinite(pr.kiss.t) && pr.kiss.t !== r.kissT) {
+    r.kissT = pr.kiss.t;
+    if (Math.abs(Date.now() - pr.kiss.t) < 4000) {
+      r.kissTo = pr.kiss.to; r.kissUntil = performance.now() + 2600;
+      if (pr.kiss.to === myPeer) { flash(r.nick + ' kissed you'); spawnHearts(tmp.set((r.x + me.x) / 2, me.av.g.position.y + 1.5, (r.z + me.z) / 2).clone(), 8); }
+    }
+  }
   r.pig = pr.pig && typeof pr.pig.to === 'string' && (pr.pig.r === 'c' || pr.pig.r === 'r') ? { to: pr.pig.to, r: pr.pig.r } : null;
   r.act = ACTS.includes(pr.act) ? pr.act : '';
   r.seat = typeof pr.seat === 'string' && seatById.has(pr.seat) ? pr.seat : null;
@@ -864,6 +939,24 @@ document.querySelectorAll('#wb [data-w]').forEach((b) => b.addEventListener('cli
 $('wbClear').onclick = () => { if (wbOpen < 0) return; for (let i = myStrokes.length - 1; i >= 0; i--) if (myStrokes[i].b === wbOpen) myStrokes.splice(i, 1); renderBoard(wbOpen); sendWb(true); };
 $('wbClose').onclick = closeBoard;
 
+// ---------- kiss ----------
+// K next to someone: you turn to them, step in close and lean in for a couple of seconds, with hearts.
+// presence.kiss = { to: their peer label, t: when }; they see it on their side, and both at once makes more hearts.
+let myKiss = null;
+me.kissUntil = 0; me.kissTo = null;
+function kiss() {
+  if (!entered || me.ride) return;
+  closeMoves();
+  const id = nearest(1.8);
+  if (!id) { flash('Stand close to them first'); return; }
+  if (me.act) standUp();
+  if (myPig) setPig(null);
+  me.kissTo = id; me.kissUntil = performance.now() + 2600;
+  myKiss = { to: id, t: Date.now() };
+  if (room && entered) room.presence({ kiss: myKiss }).catch(() => {});
+  const r = remotes.get(id), both = r && r.kissTo === myPeer && performance.now() < (r.kissUntil || 0);
+  spawnHearts(tmp.set((r.x + me.x) / 2, me.av.g.position.y + 1.5, (r.z + me.z) / 2).clone(), both ? 14 : 7);
+}
 // raise the arm on the partner's side so the hands meet
 function reachArm(av, ry, fromX, fromZ, toX, toZ) {
   const dx = toX - fromX, dz = toZ - fromZ;
@@ -968,7 +1061,7 @@ function sendPresence(force) {
   if (!force && now - lastSent < 90) return;
   const driving = me.ride && me.ride.s === 0 ? cartById.get(me.ride.id) : null;
   const st = { nick, color, x: +me.x.toFixed(2), z: +me.z.toFixed(2), ry: +me.ry.toFixed(2), hold: myHold, g: gender,
-    act: ACTS.includes(me.act) ? me.act : null, seat: me.seat, ride: me.ride, pig: myPig, cp: driving ? [r2(driving.x), r2(driving.z), r2(driving.ry)] : null };
+    act: ACTS.includes(me.act) ? me.act : null, seat: me.seat, ride: me.ride, pig: myPig, kiss: myKiss, cp: driving ? [r2(driving.x), r2(driving.z), r2(driving.ry)] : null };
   const key = JSON.stringify(st);
   if (!force && key === lastKey) return;
   lastKey = key; lastSent = now;
@@ -995,6 +1088,7 @@ COLORS.forEach((c) => {
   b.onclick = () => {
     gender = b.dataset.g;
     [...$('gender').children].forEach((x) => x.setAttribute('aria-checked', String(x === b)));
+    const nm = $('nick'); if (!nm.value.trim() || nm.value.trim() === 'Jiho' || nm.value.trim() === 'Isa') nm.value = gender === 'f' ? 'Isa' : 'Jiho';
     if (me.av.gender !== gender) { const old = me.av; me.av = makeAvatar(color, skinIdx, gender); scene.remove(old.g); }
   };
 });
@@ -1068,6 +1162,7 @@ addEventListener('keydown', (e) => {
   if (typing()) return;
   if (wbOpen >= 0) { if (e.code === 'KeyE' || e.code === 'Escape') { e.preventDefault(); closeBoard(); } return; }
   if (e.code === 'KeyE' && entered && !e.repeat) { toggleBoard(); return; }
+  if (e.code === 'KeyK' && entered && !e.repeat) { kiss(); return; }
   if (e.key === 'Enter' && entered) { e.preventDefault(); $('say').focus(); return; }
   if (e.code === 'KeyH' && entered) { sendHeart(); return; }
   if (e.code === 'KeyG' && entered) { if (myPig) setPig(null); toggleHold(); return; }
@@ -1179,6 +1274,7 @@ function frame() {
     W.placeCart(c, c.x + (tg[0] - c.x) * kk, c.z + (tg[1] - c.z) * kk, lerpAngle(c.ry, tg[2], kk));
   }
   const pigP = pigWith(), riding = pigP && myPig.r === 'r' ? pigP : null, carrying = pigP && myPig.r === 'c' ? pigP : null;
+  const kissing = !me.ride && !pigP && performance.now() < me.kissUntil ? remotes.get(me.kissTo) : null;
   let vx = 0, vz = 0, partner = null;
   if (me.ride) {
     const c = cartById.get(me.ride.id);
@@ -1224,6 +1320,11 @@ function frame() {
     if (!me.act) dribble(me.speed > 0.3 ? (me.x - ox) / dt : 0, me.speed > 0.3 ? (me.z - oz) / dt : 0);
     me.lift = me.seat && seatById.has(me.seat) ? seatById.get(me.seat).y - groundH(me.x, me.z) : null;
   }
+  if (kissing) {
+    const dx = me.x - kissing.x, dz = me.z - kissing.z, d = Math.hypot(dx, dz) || 1, kk = 1 - Math.exp(-6 * dt);
+    me.x += (kissing.x + dx / d * 0.42 - me.x) * kk; me.z += (kissing.z + dz / d * 0.42 - me.z) * kk;
+    me.ry = lerpAngle(me.ry, Math.atan2(-dx, -dz), kk);
+  }
   if (!!pigP !== wasPig) {
     wasPig = !!pigP;
     if (pigP) spawnHearts(tmp.set(me.x, me.av.g.position.y + 1.6, me.z).clone(), 6);
@@ -1235,7 +1336,7 @@ function frame() {
   me.av.g.position.set(me.x, groundH(me.x, me.z), me.z); me.av.g.rotation.y = me.ry;
   const swimming = !me.ride && W.inPool(me.x, me.z);
   if (swimming && me.act) standUp();
-  animateAvatar(me.av, me.speed, dt, riding ? 'piggy' : carrying ? 'carry' : swimming ? (me.speed > 0.3 ? 'swim' : 'tread') : me.act, me.lift);
+  animateAvatar(me.av, me.speed, dt, riding ? 'piggy' : carrying ? 'carry' : kissing ? 'kiss' : swimming ? (me.speed > 0.3 ? 'swim' : 'tread') : me.act, me.lift);
   if (partner) reachArm(me.av, me.ry, me.x, me.z, partner.x, partner.z);
   stepBall(dt);
   stepTennis(dt);
@@ -1260,7 +1361,7 @@ function frame() {
     if (rp && rp.role === 'r') { r.x = rp.o.x - Math.sin(rp.o.ry) * 0.3; r.z = rp.o.z - Math.cos(rp.o.ry) * 0.3; r.ry = rp.o.ry; r.speed = rp.o.speed; }
     r.av.g.position.set(r.x, groundH(r.x, r.z), r.z); r.av.g.rotation.y = r.ry;
     const rSwim = !r.ride && W.inPool(r.x, r.z);
-    animateAvatar(r.av, r.speed, dt, r.ride ? (r.ride.s === 0 ? 'drive' : 'ride') : rp ? (rp.role === 'r' ? 'piggy' : 'carry') : rSwim ? (r.speed > 0.3 ? 'swim' : 'tread') : r.act, lift);
+    animateAvatar(r.av, r.speed, dt, r.ride ? (r.ride.s === 0 ? 'drive' : 'ride') : rp ? (rp.role === 'r' ? 'piggy' : 'carry') : performance.now() < (r.kissUntil || 0) ? 'kiss' : rSwim ? (r.speed > 0.3 ? 'swim' : 'tread') : r.act, lift);
     r.av.racket.visible = TN.inside(r.x, r.z);
     if (partner && r === partner) reachArm(r.av, r.ry, r.x, r.z, me.x, me.z);
     if (Math.hypot(r.x - me.x, r.z - me.z) < 1.7 && now > nearHeartT) {
@@ -1336,6 +1437,13 @@ clockHST(); setInterval(clockHST, 10000);
 
 me.tag.nm.textContent = 'You';
 renderPeers();
+// Jiho's and Isa's models load in the background; until then they show as the hand-built avatars
+if (THREE.GLTFLoader) for (const kind of ['m', 'f']) new THREE.GLTFLoader().load(MODELS[kind].url, (gltf) => {
+  if (!prepareModel(kind, gltf)) return;
+  const swap = (o, col, skin) => { if (o.av.gender !== kind || o.av.model) return; const old = o.av; o.av = makeAvatar(col, skin, kind); o.av.g.position.copy(old.g.position); o.av.g.rotation.y = old.g.rotation.y; scene.remove(old.g); };
+  swap(me, color, skinIdx);
+  for (const r of remotes.values()) swap(r, r.color, r.skin);
+}, undefined, () => {});
 connectRoom();
 prefillName();
 requestAnimationFrame(frame);
