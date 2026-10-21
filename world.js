@@ -369,16 +369,23 @@ function createWorld(canvas) {
   const overlayMat = (map, extra) => new THREE.MeshStandardMaterial(Object.assign({ map, roughness: 0.92, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }, extra || {}));
 
   // ---------- ground ----------
-  const grassTex = canvasTex(512, 512, (g, W, H) => {
-    g.fillStyle = '#d9e3c6'; g.fillRect(0, 0, W, H);
+  const grassTex = canvasTex(1024, 1024, (g, W, H) => {
+    g.fillStyle = '#d6e2c0'; g.fillRect(0, 0, W, H);
     const r = rng(11);
-    for (let i = 0; i < 9000; i++) {
-      const x = r() * W, y = r() * H, l = 3 + r() * 7, a = -Math.PI / 2 + (r() - 0.5) * 1.2;
-      const v = r();
-      g.strokeStyle = v < 0.45 ? 'rgba(70,95,40,0.30)' : v < 0.8 ? 'rgba(250,255,225,0.30)' : 'rgba(150,130,70,0.25)';
-      g.lineWidth = 1 + r();
+    // soft clumps of lighter and darker growth
+    for (let i = 0; i < 260; i++) {
+      const x = r() * W, y = r() * H, rad = 18 + r() * 60, gr = g.createRadialGradient(x, y, 0, x, y, rad);
+      gr.addColorStop(0, r() < 0.55 ? 'rgba(80,110,45,0.16)' : 'rgba(255,255,230,0.14)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
+    // blades, short and long, in two greens with sunlit tips
+    for (let i = 0; i < 26000; i++) {
+      const x = r() * W, y = r() * H, l = 4 + r() * 11, a = -Math.PI / 2 + (r() - 0.5) * 1.1, v = r();
+      g.strokeStyle = v < 0.42 ? 'rgba(62,92,34,0.32)' : v < 0.8 ? 'rgba(246,255,218,0.30)' : v < 0.93 ? 'rgba(120,150,60,0.30)' : 'rgba(160,140,80,0.26)';
+      g.lineWidth = 0.8 + r() * 1.1;
       g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
     }
+    for (let i = 0; i < 90; i++) { g.fillStyle = r() < 0.7 ? 'rgba(255,255,240,0.75)' : 'rgba(250,220,90,0.75)'; g.beginPath(); g.arc(r() * W, r() * H, 1.4 + r() * 1.2, 0, 7); g.fill(); }
   });
   const treeShadeBands = treeLines.filter((t) => t.kind !== 'hedge');
   (function ground() {
@@ -500,6 +507,14 @@ function createWorld(canvas) {
       [-3.66, 3.66].forEach((z) => { const sd = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 2.44), netMat); sd.position.set(0.9, 1.22, z); goal.add(sd); });
       for (const z of [-3.66, 3.66]) { const [wx, wz] = toWorld(TRACK, gx, z); colliders.circles.push({ x: wx, z: wz, r: 0.25 }); }
     });
+    // start/finish gantry over the line on the home straight (the race starts here)
+    {
+      const bannerTex = canvasTex(512, 64, (c, W2, H2) => { c.fillStyle = '#b52a2f'; c.fillRect(0, 0, W2, H2); c.fillStyle = '#f4efe2'; c.font = 'bold 34px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('HPA  ·  START / FINISH', W2 / 2, H2 / 2 + 2); });
+      const pole = new THREE.MeshStandardMaterial({ color: C('#e9e7e1'), roughness: 0.5, metalness: 0.3 });
+      for (const z of [-R_IN + 0.25, -R_OUT - 0.25]) { const pm = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.08, 3.4, 10), pole); pm.position.set(TL, 1.7, z); pm.castShadow = true; trackG.add(pm); const [wx, wz] = toWorld(TRACK, TL, z); colliders.circles.push({ x: wx, z: wz, r: 0.15 }); }
+      const ban = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.75, R_OUT - R_IN + 0.5), [new THREE.MeshStandardMaterial({ map: bannerTex, roughness: 0.7 }), new THREE.MeshStandardMaterial({ map: bannerTex, roughness: 0.7 }), pole, pole, pole, pole]);
+      ban.position.set(TL, 3.0, -(R_IN + R_OUT) / 2); ban.castShadow = true; trackG.add(ban);
+    }
     // concrete seating tiers stepping up the grass bank on the north-east straight, curling round at both ends
     {
       const parts = [], tan = C('#c9bc9e'), cap = C('#d8ccb0');
@@ -2056,23 +2071,39 @@ function createWorld(canvas) {
   // seat 0 = driver (left side), seat 1 = passenger; world x, z and seat height
   function cartSeat(c, seat) { const [x, z] = toWorld({ x: c.x, z: c.z, rot: c.ry }, seat === 0 ? 0.27 : -0.27, -0.1); return { x, z, y: groundH(c.x, c.z) + 0.78 }; }
   (function golfCarts() {
-    const m = (c, r, mt) => new THREE.MeshStandardMaterial({ color: C(c), roughness: r, metalness: mt || 0 });
-    const white = m('#f2f1ec', 0.35, 0.15), seatM = m('#d8c4a0', 0.8), dark = m('#1d1e21', 0.6), roofM = m('#2b2c30', 0.5), chrome = m('#c9ccd0', 0.3, 0.8);
-    const add = (g, geo, mat, x, y, z) => { const mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh); return mesh; };
+    const cartBody = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.15 });
+    const cartGlass = new THREE.MeshStandardMaterial({ color: C('#cfe3ee'), transparent: true, opacity: 0.25, roughness: 0.1, side: THREE.DoubleSide, depthWrite: false });
+    const cartGeo = (() => {
+      const P2 = [], wh = C('#f2f1ec'), dk = C('#1d1e21'), seat = C('#d8c4a0'), seatD = C('#b9a37f'), chrome = C('#c9ccd0'), red = C('#b52a2f'), lamp = C('#fff6d8');
+      const box2 = (w, h, d, x, y, z, c, rx) => { const g = new THREE.BoxGeometry(w, h, d); if (rx) g.rotateX(rx); P2.push({ g: g.translate(x, y, z), c }); };
+      box2(1.2, 0.3, 2.3, 0, 0.42, 0, wh);                                   // tub
+      box2(1.22, 0.06, 2.32, 0, 0.3, 0, dk);                                 // rocker strip
+      box2(1.23, 0.07, 1.6, 0, 0.5, -0.1, red);                              // HPA red stripe along the sides
+      const cowl = new THREE.SphereGeometry(0.6, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); cowl.scale(1, 0.62, 0.55); P2.push({ g: cowl.translate(0, 0.57, 0.92), c: wh });
+      box2(1.18, 0.1, 0.12, 0, 0.36, 1.2, dk);                               // front bumper
+      for (const x of [-0.38, 0.38]) { P2.push({ g: new THREE.CylinderGeometry(0.07, 0.07, 0.03, 12).rotateX(Math.PI / 2).translate(x, 0.66, 1.2), c: lamp }); }
+      box2(1.12, 0.03, 0.9, 0, 0.58, 0.45, dk);                              // floor mat
+      box2(1.06, 0.15, 0.55, 0, 0.72, -0.14, seat);                          // seat cushion
+      box2(1.06, 0.48, 0.1, 0, 1.0, -0.43, seat, -0.12);                     // back rest
+      box2(0.52, 0.03, 0.5, -0.27, 0.8, -0.14, seatD); box2(0.52, 0.03, 0.5, 0.27, 0.8, -0.14, seatD);
+      for (const x of [-0.56, 0.56]) box2(0.06, 0.2, 0.5, x, 0.86, -0.18, wh); // arm rests
+      box2(1.12, 0.24, 0.62, 0, 0.67, -0.88, wh);                            // rear deck
+      for (const x of [-0.42, 0.42]) box2(0.05, 0.55, 0.05, x, 1.0, -1.12, chrome);
+      box2(0.9, 0.05, 0.3, 0, 1.25, -1.12, chrome);                          // bag rack
+      for (const [x, z] of [[0.55, 0.78], [-0.55, 0.78], [0.55, -0.78], [-0.55, -0.78]]) {
+        P2.push({ g: new THREE.CylinderGeometry(0.22, 0.22, 0.17, 18).rotateZ(Math.PI / 2).translate(x, 0.22, z), c: dk });
+        P2.push({ g: new THREE.CylinderGeometry(0.12, 0.12, 0.18, 12).rotateZ(Math.PI / 2).translate(x * 1.01, 0.22, z), c: chrome });
+      }
+      for (const [x, z] of [[0.52, 0.62], [-0.52, 0.62], [0.52, -0.62], [-0.52, -0.62]]) box2(0.05, 1.3, 0.05, x, 1.25, z, chrome);
+      box2(1.3, 0.06, 1.95, 0, 1.93, 0, wh); box2(1.26, 0.03, 1.9, 0, 1.895, 0, dk);  // roof, dark underside
+      const wheel = new THREE.TorusGeometry(0.15, 0.025, 6, 18); wheel.rotateX(-1.0); P2.push({ g: wheel.translate(0.27, 1.08, 0.42), c: dk });
+      P2.push({ g: new THREE.CylinderGeometry(0.025, 0.025, 0.4, 6).rotateX(0.55).translate(0.27, 0.92, 0.52), c: dk });
+      return mergeGeoms(P2);
+    })();
     function cartMesh() {
       const g = new THREE.Group();
-      add(g, new THREE.BoxGeometry(1.2, 0.32, 2.3), white, 0, 0.42, 0);
-      add(g, new THREE.BoxGeometry(1.16, 0.42, 0.55), white, 0, 0.78, 0.92);
-      add(g, new THREE.BoxGeometry(1.05, 0.14, 0.52), seatM, 0, 0.7, -0.12);
-      add(g, new THREE.BoxGeometry(1.05, 0.45, 0.1), seatM, 0, 0.98, -0.4);
-      add(g, new THREE.BoxGeometry(1.12, 0.22, 0.62), white, 0, 0.66, -0.86);
-      for (const [x, z] of [[0.55, 0.78], [-0.55, 0.78], [0.55, -0.78], [-0.55, -0.78]]) { const w = add(g, new THREE.CylinderGeometry(0.22, 0.22, 0.18, 16), dark, x, 0.22, z); w.rotation.z = Math.PI / 2; }
-      for (const [x, z] of [[0.52, 0.62], [-0.52, 0.62], [0.52, -0.62], [-0.52, -0.62]]) add(g, new THREE.BoxGeometry(0.05, 1.3, 0.05), chrome, x, 1.25, z);
-      add(g, new THREE.BoxGeometry(1.3, 0.07, 1.95), roofM, 0, 1.92, 0);
-      const wheel = add(g, new THREE.TorusGeometry(0.15, 0.025, 6, 18), dark, 0.27, 1.08, 0.42); wheel.rotation.x = -1.0;
-      const col = add(g, new THREE.CylinderGeometry(0.025, 0.025, 0.4, 6), dark, 0.27, 0.92, 0.52); col.rotation.x = 0.55;
-      const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.75), new THREE.MeshStandardMaterial({ color: C('#cfe3ee'), transparent: true, opacity: 0.25, roughness: 0.1, side: THREE.DoubleSide, depthWrite: false }));
-      glass.position.set(0, 1.5, 0.62); glass.rotation.x = -0.1; g.add(glass);
+      const body = new THREE.Mesh(cartGeo, cartBody); body.castShadow = true; body.receiveShadow = true; g.add(body);
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.75), cartGlass); glass.position.set(0, 1.5, 0.62); glass.rotation.x = -0.1; g.add(glass);
       scene.add(g);
       return g;
     }
@@ -2108,7 +2139,26 @@ function createWorld(canvas) {
       parts.push({ g, c: shade });
     }
     parts.push({ g: new THREE.ConeGeometry(0.4, 2.2, 6).translate(lean * H, H + 0.4, lean * H), c: C('#3a5f33') });
-    return mergeGeoms(parts);
+    return shadeFoliage(mergeGeoms(parts), 2.2, seed);
+  }
+  // light the canopy from inside the tree: darker at the core and underneath, sunlit on the outer tops, speckled like
+  // leaves; normals get a little jitter so the foliage glints instead of reading as smooth plastic
+  function shadeFoliage(geo, minY, seed) {
+    const p = geo.attributes.position, c = geo.attributes.color, n = geo.attributes.normal, r = rng(seed * 31 + 7);
+    let cx = 0, cz = 0, k = 0, top = 0;
+    for (let i = 0; i < p.count; i++) if (p.getY(i) > minY) { cx += p.getX(i); cz += p.getZ(i); k++; top = Math.max(top, p.getY(i)); }
+    cx /= k || 1; cz /= k || 1;
+    let maxR = 0.1;
+    for (let i = 0; i < p.count; i++) if (p.getY(i) > minY) maxR = Math.max(maxR, Math.hypot(p.getX(i) - cx, p.getZ(i) - cz));
+    for (let i = 0; i < p.count; i++) {
+      const y = p.getY(i); if (y <= minY) continue;
+      const out = Math.hypot(p.getX(i) - cx, p.getZ(i) - cz) / maxR, up = n.getY(i), h = (y - minY) / Math.max(0.1, top - minY);
+      const f = 0.45 + 0.4 * out + 0.3 * Math.max(0, up) + 0.15 * h + (r() - 0.5) * 0.3, warm = Math.max(0, f - 1) * 0.5;
+      c.setXYZ(i, c.getX(i) * (f + warm), c.getY(i) * f * (1 + (r() - 0.5) * 0.1), c.getZ(i) * f * 0.92);
+      n.setXYZ(i, n.getX(i) + (r() - 0.5) * 0.35, n.getY(i) + (r() - 0.5) * 0.35, n.getZ(i) + (r() - 0.5) * 0.35);
+    }
+    n.needsUpdate = true; c.needsUpdate = true; geo.normalizeNormals();
+    return geo;
   }
   function blob(radius, seed, detail) {
     const g = new THREE.IcosahedronGeometry(1, detail);
@@ -2127,17 +2177,17 @@ function createWorld(canvas) {
     const r = rng(seed), parts = [];
     const trunkH = form === 'bush' ? 0.3 : size * (form === 'tall' ? 1.4 : 0.85);
     if (form !== 'bush') parts.push({ g: new THREE.CylinderGeometry(size * 0.06, size * 0.11, trunkH + size * 0.5, coarse ? 4 : 6).translate(0, (trunkH + size * 0.5) / 2, 0), c: C('#5a4636') });
-    const nb = form === 'bush' ? 4 : (coarse ? 4 : 6 + Math.floor(r() * 3));
+    const nb = form === 'bush' ? 5 : (coarse ? 4 : 9 + Math.floor(r() * 3));
     for (let i = 0; i < nb; i++) {
-      const a = r() * Math.PI * 2, d = (form === 'wide' ? 0.75 : 0.5) * size * r();
-      const rad = size * (0.45 + r() * 0.3) * (coarse ? 1.15 : 1);
+      const a = r() * Math.PI * 2, d = (form === 'wide' ? 0.8 : 0.55) * size * Math.sqrt(r());
+      const rad = size * (coarse ? 0.52 + r() * 0.3 : 0.34 + r() * 0.24);
       const g = blob(rad, seed + i * 7, coarse ? 0 : 1);
       g.scale(form === 'wide' ? 1.25 : 1, form === 'wide' ? 0.7 : (form === 'tall' ? 1.25 : 1), form === 'wide' ? 1.25 : 1);
       g.translate(Math.cos(a) * d, trunkH + size * (0.35 + r() * 0.5) + (form === 'tall' ? size * 0.4 * r() : 0), Math.sin(a) * d);
       const col = C('#3b6a2c').lerp(C('#5d8a38'), r()).lerp(C('#2f5426'), r() * 0.5);
       parts.push({ g, c: col });
     }
-    return mergeGeoms(parts);
+    return shadeFoliage(mergeGeoms(parts), form === 'bush' ? 0 : trunkH * 0.7, seed);
   }
   const foliageMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
   const PINE_SPECS = [15, 18, 20, 23, 26];
@@ -2621,6 +2671,75 @@ function createWorld(canvas) {
     return gust;
   }
 
+  // ---------- batch the static scenery ----------
+  // Every mesh that never moves after it is built is merged with the others sharing its material, its shadow settings
+  // and its 160 m cell of the map, so the scene draws in a few hundred calls instead of thousands while whole cells can
+  // still be culled. Plain single-colour materials are folded into vertex colours, so they merge across colours too.
+  // Things that move or change (flags, fans, golf carts, the cat, the sky) are left alone.
+  (function staticBatch() {
+    const skip = new Set(), flagGeos = new Set(flags.map((f) => f.geo));
+    for (const root of [...fans, cat.g, ...carts.map((c) => c.mesh), sky]) root.traverse((o) => skip.add(o));
+    scene.updateMatrixWorld(true);
+    const buckets = new Map(), done = [], geoOf = new Map(), CELL = 160, v = new THREE.Vector3();
+    const usable = (m) => m && (m.isMeshStandardMaterial || m.isMeshLambertMaterial || m.isMeshBasicMaterial) && !m.transparent && m.visible !== false;
+    scene.traverse((o) => {
+      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || skip.has(o) || flagGeos.has(o.geometry) || !o.visible) return;
+      const geo = o.geometry, mats = Array.isArray(o.material) ? o.material : [o.material];
+      if (!geo.attributes.position || geo.attributes.position.count > 30000 || mats.some((m) => m.transparent)) return;
+      let g2 = geo.index ? geo.toNonIndexed() : geo.clone();
+      if (!g2.attributes.normal) g2.computeVertexNormals();
+      g2.applyMatrix4(o.matrixWorld);
+      g2.computeBoundingSphere(); v.copy(g2.boundingSphere.center);
+      const cell = Math.floor(v.x / CELL) + ',' + Math.floor(v.z / CELL);
+      const ranges = Array.isArray(o.material) ? (geo.groups.length ? g2.groups : [{ start: 0, count: g2.attributes.position.count, materialIndex: 0 }]) : [{ start: 0, count: g2.attributes.position.count, materialIndex: 0 }];
+      let used = false;
+      for (const rg of ranges) {
+        const m = mats[rg.materialIndex];
+        if (!usable(m)) continue;
+        const plain = m.isMeshStandardMaterial && !m.map && !m.vertexColors && !m.emissiveMap && m.emissive.getHex() === 0 && !m.polygonOffset && m.opacity === 1;
+        const sig = plain ? 'c' : (g2.attributes.uv ? 'u' : '') + (m.vertexColors && g2.attributes.color ? 'c' : '');
+        const look = plain ? 'plain' + Math.round(m.roughness * 10) + '/' + Math.round(m.metalness * 10) + '/' + m.side : m.uuid;
+        const key = look + '|' + cell + '|' + (o.castShadow ? 1 : 0) + (o.receiveShadow ? 1 : 0) + '|' + sig;
+        let b = buckets.get(key);
+        if (!b) buckets.set(key, (b = { m: plain ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: m.roughness, metalness: m.metalness, side: m.side }) : m, cast: o.castShadow, receive: o.receiveShadow, sig, parts: [] }));
+        b.parts.push({ g: g2, start: rg.start, count: Math.min(rg.count, g2.attributes.position.count - rg.start), color: plain ? m.color : null });
+        used = true;
+      }
+      if (used) { done.push(o); geoOf.set(o, g2); }
+    });
+    const merged = new Set();
+    for (const b of buckets.values()) {
+      if (b.parts.length < 2) continue;
+      let n = 0; for (const q of b.parts) n += q.count;
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = b.sig.includes('u') ? new Float32Array(n * 2) : null, col = b.sig.includes('c') ? new Float32Array(n * 3) : null;
+      let o = 0;
+      for (const q of b.parts) {
+        const A = q.g.attributes;
+        pos.set(A.position.array.subarray(q.start * 3, (q.start + q.count) * 3), o * 3);
+        nor.set(A.normal.array.subarray(q.start * 3, (q.start + q.count) * 3), o * 3);
+        if (uv) uv.set(A.uv.array.subarray(q.start * 2, (q.start + q.count) * 2), o * 2);
+        if (col && q.color) for (let k = 0; k < q.count; k++) { col[(o + k) * 3] = q.color.r; col[(o + k) * 3 + 1] = q.color.g; col[(o + k) * 3 + 2] = q.color.b; }
+        else if (col) col.set(A.color.array.subarray(q.start * 3, (q.start + q.count) * 3), o * 3);
+        o += q.count;
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      if (uv) g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      if (col) g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      g.computeBoundingSphere();
+      const mesh = new THREE.Mesh(g, b.m); mesh.castShadow = b.cast; mesh.receiveShadow = b.receive; mesh.matrixAutoUpdate = false;
+      scene.add(mesh);
+      for (const q of b.parts) merged.add(q);
+    }
+    // drop the originals whose every part went into a merged mesh; the rest stay as they were
+    const partsOf = new Map();
+    for (const b of buckets.values()) for (const q of b.parts) { if (!partsOf.has(q.g)) partsOf.set(q.g, []); partsOf.get(q.g).push(q); }
+    for (const o of done) {
+      const qs = partsOf.get(geoOf.get(o)) || [];
+      if (qs.length && qs.every((q) => merged.has(q))) o.parent.remove(o);
+    }
+  })();
+
   // spawn on the north-east straight in front of the bleachers, facing down the track
   const [sx, sz] = toWorld(TRACK, -20, -(R_IN + 3.6));
   const fwd = [Math.cos(TRACK.rot), -Math.sin(TRACK.rot)];
@@ -2629,7 +2748,7 @@ function createWorld(canvas) {
   const spawn = { x: sx, z: sz, ry: Math.atan2(fwd[0], fwd[1]), camYaw: Math.atan2(-fwd[0], -fwd[1]) };
   const bounds = { minX: -260, maxX: 640, minZ: -340, maxZ: 260 };
 
-  const field = { x: TRACK.x, z: TRACK.z, rot: TRACK.rot, halfL: FIELD_L / 2, halfW: FIELD_W / 2, rIn: R_IN, TL, y: groundH(0, 0) };
+  const field = { x: TRACK.x, z: TRACK.z, rot: TRACK.rot, halfL: FIELD_L / 2, halfW: FIELD_W / 2, rIn: R_IN, rOut: R_OUT, TL, y: groundH(0, 0) };
   tennis.inside = (x, z) => { const [lx, lz] = toLocal(tennis, x, z); return Math.abs(lx) < tennis.hw - 0.3 && Math.abs(lz) < tennis.hd - 0.3; };
   return { scene, renderer, camera, groundH, colliders, flags, C, spawn, bounds, update, setTime, setQuality, times: TIMES, get timeKey() { return timeKey; },
     seats, carts, placeCart, cartSeat, field, tennis, pool, inPool, cat: cat.g, toLocal, toWorld, roomAt, boards };

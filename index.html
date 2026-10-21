@@ -73,6 +73,8 @@ body { font-family: var(--body); overflow: hidden; }
 @media (prefers-reduced-motion: reduce) { .btn.pulse { animation: none; } }
 #toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(104px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 32px); padding: 8px 14px; font-size: 14px; text-align: center; pointer-events: none; }
 #ctx { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(146px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 32px); padding: 6px 12px; font-size: 13px; pointer-events: none; white-space: nowrap; }
+#raceBig { position: absolute; left: 0; right: 0; top: 24%; text-align: center; font-family: var(--display); font-weight: 700; font-size: clamp(56px, 12vw, 120px); color: var(--foam); text-shadow: 0 4px 30px rgba(236, 79, 134, 0.7); pointer-events: none; }
+#raceHud { position: absolute; left: 50%; transform: translateX(-50%); top: calc(14px + env(safe-area-inset-top, 0px)); padding: 8px 14px; font-size: 15px; font-variant-numeric: tabular-nums; pointer-events: none; text-align: center; line-height: 1.5; }
 #goal { position: absolute; left: 0; right: 0; top: 28%; text-align: center; font-family: var(--display); font-weight: 700; font-size: clamp(48px, 10vw, 96px); color: var(--foam); text-shadow: 0 4px 30px rgba(236, 79, 134, 0.7); pointer-events: none; }
 .menu { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(3, auto); gap: 6px; padding: 8px; max-width: calc(100% - 32px); }
 .menu .btn { justify-content: space-between; gap: 10px; }
@@ -135,9 +137,11 @@ body { font-family: var(--body); overflow: hidden; }
     <div id="peers" class="panel" aria-live="polite"></div>
   </header>
 
-  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · P first person · H heart · G hold hands · B carry on your back · N hop on their back · E whiteboard · K kiss · Enter talk</div>
+  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · P first person · H heart · G hold hands · B carry on your back · N hop on their back · E whiteboard · K kiss · L race · Enter talk</div>
   <div id="ctx" class="panel" role="status" hidden></div>
   <div id="goal" hidden>Goal!</div>
+  <div id="raceBig" hidden></div>
+  <div id="raceHud" class="panel" role="status" hidden></div>
   <div id="moves" class="panel menu" hidden>
     <button class="btn" type="button" data-m="sit">Sit <kbd>X</kbd></button>
     <button class="btn" type="button" data-m="lie">Lie down <kbd>Z</kbd></button>
@@ -149,6 +153,7 @@ body { font-family: var(--body); overflow: hidden; }
     <button class="btn" type="button" data-m="hopon">Hop on back <kbd>N</kbd></button>
     <button class="btn" type="button" data-m="draw">Whiteboard <kbd>E</kbd></button>
     <button class="btn" type="button" data-m="kiss">Kiss <kbd>K</kbd></button>
+    <button class="btn" type="button" data-m="race">Race <kbd>L</kbd></button>
   </div>
   <div id="wb" class="panel" role="dialog" aria-labelledby="wbTitle" hidden>
     <div class="wbhead">
@@ -210,7 +215,7 @@ body { font-family: var(--body); overflow: hidden; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="world.js?v=17"></script>
+<script src="world.js?v=18"></script>
 <script>
 (() => {
 'use strict';
@@ -699,6 +704,8 @@ function updateCtx() {
     else if (asker) msg = asker[1].pig.r === 'c' ? asker[1].nick + ' wants to carry you · N to hop on' : asker[1].nick + ' wants a piggyback · B to carry them';
     else if (me.ride) msg = me.ride.s === 0 ? 'W/S drive · A/D steer · R get out' : 'Along for the ride · R get out';
     else if (me.act) msg = me.act === 'sit' && me.seat ? 'Sitting · move to stand up' : 'Move to stop';
+    else if (race) msg = race.phase === 'count' ? 'Get ready…' : race.phase === 'run' ? 'Shift to sprint · stay on the track · L to quit' : '';
+    else if (inStartBox()) msg = 'L · start a race (one lap)';
     else if (nearestBoard() >= 0) msg = 'E · draw on the whiteboard';
     else if (W.inPool(me.x, me.z)) msg = me.speed > 0.3 ? 'Swimming · Shift to swim faster' : 'Treading water · walk to an edge to climb out';
     else if (TN.inside(me.x, me.z)) msg = tb.live && Math.hypot(tb.x - me.x, tb.z - me.z) < 2.6 ? 'F · hit' : 'F · serve · balls that reach you come back by themselves';
@@ -716,7 +723,7 @@ movesBtn.onclick = () => { const open = movesMenu.hidden; movesMenu.hidden = !op
 movesMenu.addEventListener('click', (e) => {
   const b = e.target.closest('button[data-m]'); if (!b) return;
   const m = b.dataset.m;
-  if (m === 'kick') kickOrHit(); else if (m === 'ride') toggleRide(); else if (m === 'carry') togglePig('c'); else if (m === 'hopon') togglePig('r'); else if (m === 'draw') toggleBoard(); else if (m === 'kiss') kiss(); else setAct(m);
+  if (m === 'kick') kickOrHit(); else if (m === 'ride') toggleRide(); else if (m === 'carry') togglePig('c'); else if (m === 'hopon') togglePig('r'); else if (m === 'draw') toggleBoard(); else if (m === 'kiss') kiss(); else if (m === 'race') startRace(); else setAct(m);
 });
 
 // ---------- remote players ----------
@@ -748,6 +755,7 @@ function upsertRemote(peer) {
       if (pr.kiss.to === myPeer) { flash(r.nick + ' kissed you'); spawnHearts(tmp.set((r.x + me.x) / 2, me.av.g.position.y + 1.5, (r.z + me.z) / 2).clone(), 8); }
     }
   }
+  r.race = pr.race && Number.isFinite(pr.race.go) ? { go: pr.race.go, fin: Number.isFinite(pr.race.fin) ? pr.race.fin : 0 } : null;
   r.pig = pr.pig && typeof pr.pig.to === 'string' && (pr.pig.r === 'c' || pr.pig.r === 'r') ? { to: pr.pig.to, r: pr.pig.r } : null;
   r.act = ACTS.includes(pr.act) ? pr.act : '';
   r.seat = typeof pr.seat === 'string' && seatById.has(pr.seat) ? pr.seat : null;
@@ -975,6 +983,89 @@ function kiss() {
   const r = remotes.get(id), both = r && r.kissTo === myPeer && performance.now() < (r.kissUntil || 0);
   spawnHearts(tmp.set((r.x + me.x) / 2, me.av.g.position.y + 1.5, (r.z + me.z) / 2).clone(), both ? 14 : 7);
 }
+// ---------- race on the track ----------
+// Stand behind the start/finish line on the home straight and press L. Everyone else in the start box joins the same
+// race; a shared 3-2-1 countdown, then one lap. Distance only counts on the track, so cutting the infield doesn't help.
+// presence.race = { go: epoch ms of the start, fin: lap time in ms once finished }.
+const RACE_LEN = 4 * field.TL + 2 * Math.PI * (field.rIn + field.rOut) / 2;
+let race = null, raceBest = 0, raceBigUntil = 0, lastRaceHud = '';
+try { raceBest = +localStorage.getItem('hpaRaceBest') || 0; } catch (e) {}
+const fmtTime = (ms) => { const t = ms / 1000, m = Math.floor(t / 60); return (m ? m + ':' + String((t % 60).toFixed(1)).padStart(4, '0') : t.toFixed(1)) + 's'; };
+// where a point is along the lap, counted from the start of the home straight, and whether it is on the running lanes
+function lapPos(x, z) {
+  const [lx, lz] = W.toLocal(field, x, z), TL = field.TL, Rm = (field.rIn + field.rOut) / 2;
+  const d = Math.hypot(Math.max(Math.abs(lx) - TL, 0), lz), on = d > field.rIn - 1.2 && d < field.rOut + 1.5;
+  let s;
+  if (lx > TL) s = 2 * TL + (Math.atan2(lz, lx - TL) + Math.PI / 2) * Rm;
+  else if (lx < -TL) { const a = Math.atan2(lz, lx + TL); s = 4 * TL + Math.PI * Rm + (a > 0 ? a - Math.PI / 2 : a + 1.5 * Math.PI) * Rm; }
+  else s = lz < 0 ? lx + TL : 2 * TL + Math.PI * Rm + (TL - lx);
+  return { s, on };
+}
+function inStartBox() {
+  const [lx, lz] = W.toLocal(field, me.x, me.z);
+  return lx > field.TL - 9 && lx < field.TL - 0.3 && lz < -field.rIn + 0.3 && lz > -field.rOut - 0.3;
+}
+function joinRace(go) {
+  const p = lapPos(me.x, me.z);
+  race = { go, phase: 'count', last: p.s, dist: 0, need: 2 * field.TL - p.s + RACE_LEN, fin: 0 };
+  if (me.act) standUp();
+  if (room && entered) room.presence({ race: { go, fin: null } }).catch(() => {});
+}
+function startRace() {
+  if (!entered || me.ride) return;
+  closeMoves();
+  if (race) { race = null; if (room && entered) room.presence({ race: null }).catch(() => {}); flash('Left the race'); return; }
+  if (!inStartBox()) { flash('Go to the start line on the home straight first'); return; }
+  joinRace(Date.now() + 3000);
+}
+function stepRace(dt) {
+  const hud = $('raceHud'), big = $('raceBig'), now = Date.now();
+  // a race someone nearby just started: join it if we're in the start box too
+  if (!race && inStartBox()) for (const r of remotes.values()) if (r.race && r.race.go > now + 400 && !r.race.fin) { joinRace(r.race.go); break; }
+  let bigText = '';
+  if (race) {
+    if (race.phase === 'count') {
+      const left = race.go - now;
+      if (left > 0) bigText = String(Math.ceil(left / 1000));
+      else { race.phase = 'run'; race.last = lapPos(me.x, me.z).s; raceBigUntil = performance.now() + 900; }
+    }
+    if (race.phase === 'run') {
+      const p = lapPos(me.x, me.z), L = RACE_LEN;
+      let ds = p.s - race.last; if (ds > L / 2) ds -= L; if (ds < -L / 2) ds += L;
+      if (p.on && Math.abs(ds) < 4) race.dist += ds;
+      race.last = p.s;
+      if (race.dist >= race.need) {
+        race.phase = 'done'; race.fin = now - race.go;
+        const best = !raceBest || race.fin < raceBest;
+        if (best) { raceBest = race.fin; try { localStorage.setItem('hpaRaceBest', String(raceBest)); } catch (e) {} }
+        if (room && entered) room.presence({ race: { go: race.go, fin: race.fin } }).catch(() => {});
+        flash('Finish! ' + fmtTime(race.fin) + (best ? ' · your best' : ''));
+        spawnHearts(tmp.set(me.x, me.av.g.position.y + 1.8, me.z).clone(), 10);
+        raceBigUntil = performance.now() + 2500; race.doneAt = performance.now();
+      }
+    }
+    if (race.phase === 'done' && performance.now() - race.doneAt > 9000) race = null;
+    // someone who wandered off without finishing drops out after five minutes
+    else if (race.phase === 'run' && now - race.go > 300000) { race = null; if (room && entered) room.presence({ race: null }).catch(() => {}); flash('Race timed out'); }
+  }
+  if (performance.now() < raceBigUntil) bigText = race && race.phase === 'done' ? fmtTime(race.fin) : 'GO!';
+  if (big.textContent !== bigText) big.textContent = bigText;
+  big.hidden = !bigText;
+  // timer while running, then everyone's times from the same start
+  let hudText = '';
+  if (race && race.phase !== 'count') {
+    const t = race.phase === 'done' ? race.fin : now - race.go;
+    const pct = Math.min(100, Math.max(0, Math.round(race.dist / race.need * 100)));
+    hudText = (race.phase === 'done' ? 'Finished ' : 'Race ') + fmtTime(t) + (race.phase === 'run' ? ' · ' + pct + '%' : '');
+    const rows = [[nick, race.phase === 'done' ? race.fin : 0]];
+    for (const r of remotes.values()) if (r.race && r.race.go === race.go) rows.push([r.nick, r.race.fin || 0]);
+    if (rows.length > 1) hudText += '\n' + rows.sort((a, b) => (a[1] || 1e12) - (b[1] || 1e12)).map(([n, f]) => n + ' ' + (f ? fmtTime(f) : '…')).join(' · ');
+    if (raceBest) hudText += '\nBest ' + fmtTime(raceBest);
+  }
+  if (hudText !== lastRaceHud) { lastRaceHud = hudText; hud.textContent = hudText; hud.style.whiteSpace = 'pre-line'; }
+  hud.hidden = !hudText;
+}
+
 // raise the arm on the partner's side so the hands meet
 function reachArm(av, ry, fromX, fromZ, toX, toZ) {
   const dx = toX - fromX, dz = toZ - fromZ;
@@ -1111,7 +1202,7 @@ COLORS.forEach((c) => {
   };
 });
 $('go').onclick = () => {
-  nick = safeText($('nick').value.trim(), 16) || 'Guest';
+  nick = safeText($('nick').value.trim(), 16) || (gender === 'f' ? 'Isa' : 'Jiho');
   entered = true;
   $('join').hidden = true;
   me.tag.nm.textContent = nick + ' (you)';
@@ -1181,6 +1272,7 @@ addEventListener('keydown', (e) => {
   if (wbOpen >= 0) { if (e.code === 'KeyE' || e.code === 'Escape') { e.preventDefault(); closeBoard(); } return; }
   if (e.code === 'KeyE' && entered && !e.repeat) { toggleBoard(); return; }
   if (e.code === 'KeyK' && entered && !e.repeat) { kiss(); return; }
+  if (e.code === 'KeyL' && entered && !e.repeat) { startRace(); return; }
   if (e.key === 'Enter' && entered) { e.preventDefault(); $('say').focus(); return; }
   if (e.code === 'KeyH' && entered) { sendHeart(); return; }
   if (e.code === 'KeyG' && entered) { if (myPig) setPig(null); toggleHold(); return; }
@@ -1283,6 +1375,7 @@ function frame() {
     if (keys.has('KeyE')) camYaw -= dt * 1.6;
   }
   if (joy.id !== null) { ix += joy.x; iz -= joy.y; }
+  if (race && race.phase === 'count') { ix = 0; iz = 0; }
   const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.95;
   // carts someone else is driving glide toward the pose they report
   for (const c of W.carts) {
@@ -1361,6 +1454,7 @@ function frame() {
   me.av.racket.visible = TN.inside(me.x, me.z);
   sendPresence(false);
   if (wbDirty) sendWb();
+  if (entered) stepRace(dt);
   if (now > holdUiT) { holdUiT = now + 150; updateHoldUi(); updateCtx(); }
 
   const k = 1 - Math.exp(-9 * dt);
