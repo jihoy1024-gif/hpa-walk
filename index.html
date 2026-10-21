@@ -128,7 +128,7 @@ body { font-family: var(--body); overflow: hidden; }
     <div id="peers" class="panel" aria-live="polite"></div>
   </header>
 
-  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · P first person · H heart · G hold hands · Enter talk</div>
+  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · P first person · H heart · G hold hands · B carry on your back · N hop on their back · Enter talk</div>
   <div id="ctx" class="panel" role="status" hidden></div>
   <div id="goal" hidden>Goal!</div>
   <div id="moves" class="panel menu" hidden>
@@ -138,6 +138,8 @@ body { font-family: var(--body); overflow: hidden; }
     <button class="btn" type="button" data-m="wave">Wave <kbd>V</kbd></button>
     <button class="btn" type="button" data-m="kick">Kick / hit <kbd>F</kbd></button>
     <button class="btn" type="button" data-m="ride">Golf cart <kbd>R</kbd></button>
+    <button class="btn" type="button" data-m="carry">Carry on back <kbd>B</kbd></button>
+    <button class="btn" type="button" data-m="hopon">Hop on back <kbd>N</kbd></button>
   </div>
   <div id="toast" class="panel" role="status" hidden></div>
   <div id="stick" hidden><div id="knob"></div></div>
@@ -290,7 +292,7 @@ function makeAvatar(leiColor, skinIdx, gender) {
   scene.add(g);
   return { g, p, lei, legL, legR, armL, armR, skirt, racket, phase: 0, t: Math.random() * 10, kickUntil: 0, swingUntil: 0, gender: fem ? 'f' : 'm' };
 }
-// act: '' walking, 'sit', 'lie', 'hula', 'wave', 'drive', 'ride'. lift: seat height above the ground, or null on the ground
+// act: '' walking, 'sit', 'lie', 'hula', 'wave', 'drive', 'ride', 'carry', 'piggy'. lift: seat height above the ground, or null on the ground
 function animateAvatar(a, speed, dt, act, lift) {
   a.t += dt;
   const T = { py: 0, px: 0, pz: 0, rx: 0, rz: 0, lL: 0, lR: 0, aLx: 0, aRx: 0, aLz: -0.12, aRz: 0.12, sk: 0 };
@@ -316,6 +318,15 @@ function animateAvatar(a, speed, dt, act, lift) {
     T.py = -1.12; T.lL = Math.sin(a.t * 3) * 0.4; T.lR = -T.lL; T.aLz = -0.9 + Math.sin(a.t * 3) * 0.3; T.aRz = 0.9 - Math.sin(a.t * 3) * 0.3; T.aLx = T.aRx = -0.3;
   } else if (act === 'wave') {
     T.aRz = 2.65 + Math.sin(a.t * 9) * 0.35;
+  } else if (act === 'carry') {
+    // leaning forward a little, hands behind to hold the rider's legs, still walking
+    const mv = Math.min(1, speed / 3);
+    if (mv > 0.05) a.phase += dt * (4 + speed * 2.2);
+    const s = Math.sin(a.phase) * 0.5 * mv;
+    T.lL = s; T.lR = -s; T.rx = 0.22; T.aLx = T.aRx = 0.75; T.aLz = -0.35; T.aRz = 0.35;
+  } else if (act === 'piggy') {
+    // up on someone's back: legs round their waist, arms round their shoulders
+    T.py = 0.6; T.rx = 0.2; T.lL = T.lR = -1.25; T.sk = -1.0; T.aLx = T.aRx = -1.35; T.aLz = 0.45; T.aRz = -0.45;
   } else {
     const mv = Math.min(1, speed / 3);
     if (mv > 0.05) a.phase += dt * (4 + speed * 2.2);
@@ -387,6 +398,7 @@ function setAct(a) {
   if (!entered || me.ride) return;
   closeMoves();
   if (me.act === a) { standUp(); sendPresence(true); return; }
+  if (myPig) setPig(null);
   if (myHold) setHold(null);
   if (following) setFollow(null);
   me.seat = null;
@@ -407,6 +419,7 @@ function toggleRide() {
   if (!c) { flash('Walk up to a golf cart first'); return; }
   const seat = !cartOccupant(c.id, 0) ? 0 : !cartOccupant(c.id, 1) ? 1 : -1;
   if (seat < 0) { flash('This cart is full'); return; }
+  if (myPig) setPig(null);
   if (myHold) setHold(null);
   if (following) setFollow(null);
   me.seat = null; me.ride = { id: c.id, s: seat }; me.act = seat === 0 ? 'drive' : 'ride'; cartVel = 0;
@@ -570,7 +583,11 @@ function updateCtx() {
   let msg = '';
   if (performance.now() < flashUntil) msg = flashMsg;
   else if (entered) {
-    if (me.ride) msg = me.ride.s === 0 ? 'W/S drive · A/D steer · R get out' : 'Along for the ride · R get out';
+    const pg = pigWith(), asker = pigAsker();
+    if (pg) msg = myPig.r === 'c' ? 'Carrying ' + pg.nick + ' · B to put them down' : 'On ' + pg.nick + "'s back · N to hop off";
+    else if (myPig) msg = 'Waiting for ' + (remotes.get(myPig.to)?.nick || 'them') + (myPig.r === 'c' ? ' to hop on · B to cancel' : ' to carry you · N to cancel');
+    else if (asker) msg = asker[1].pig.r === 'c' ? asker[1].nick + ' wants to carry you · N to hop on' : asker[1].nick + ' wants a piggyback · B to carry them';
+    else if (me.ride) msg = me.ride.s === 0 ? 'W/S drive · A/D steer · R get out' : 'Along for the ride · R get out';
     else if (me.act) msg = me.act === 'sit' && me.seat ? 'Sitting · move to stand up' : 'Move to stop';
     else if (W.inPool(me.x, me.z)) msg = me.speed > 0.3 ? 'Swimming · Shift to swim faster' : 'Treading water · walk to an edge to climb out';
     else if (TN.inside(me.x, me.z)) msg = tb.live && Math.hypot(tb.x - me.x, tb.z - me.z) < 2.6 ? 'F · hit' : 'F · serve · balls that reach you come back by themselves';
@@ -588,7 +605,7 @@ movesBtn.onclick = () => { const open = movesMenu.hidden; movesMenu.hidden = !op
 movesMenu.addEventListener('click', (e) => {
   const b = e.target.closest('button[data-m]'); if (!b) return;
   const m = b.dataset.m;
-  if (m === 'kick') kickOrHit(); else if (m === 'ride') toggleRide(); else setAct(m);
+  if (m === 'kick') kickOrHit(); else if (m === 'ride') toggleRide(); else if (m === 'carry') togglePig('c'); else if (m === 'hopon') togglePig('r'); else setAct(m);
 });
 
 // ---------- remote players ----------
@@ -601,7 +618,7 @@ function upsertRemote(peer) {
   let r = remotes.get(peer.peer);
   if (!r) {
     const skin = peer.peer.charCodeAt(0) || 0;
-    r = { av: makeAvatar(safeColor(pr.color), skin, pr.g), skin, tag: makeTag(), x: pr.x, z: pr.z, ry: pr.ry || 0, tx: pr.x, tz: pr.z, tr: pr.ry || 0, color: safeColor(pr.color), lastSay: 0, lastHeart: pr.heart || 0, speed: 0, isMe: peer.isMe };
+    r = { av: makeAvatar(safeColor(pr.color), skin, pr.g), skin, tag: makeTag(), x: pr.x, z: pr.z, ry: pr.ry || 0, tx: pr.x, tz: pr.z, tr: pr.ry || 0, color: safeColor(pr.color), lastSay: 0, lastHeart: pr.heart || 0, speed: 0, isMe: peer.isMe, id: peer.peer };
     remotes.set(peer.peer, r);
   }
   r.tx = Math.max(W.bounds.minX, Math.min(W.bounds.maxX, pr.x)); r.tz = Math.max(W.bounds.minZ, Math.min(W.bounds.maxZ, pr.z)); r.tr = typeof pr.ry === 'number' ? pr.ry : r.tr;
@@ -611,6 +628,7 @@ function upsertRemote(peer) {
   if (gg !== r.av.gender) { const old = r.av; r.av = makeAvatar(r.color, r.skin, gg); r.av.g.position.copy(old.g.position); scene.remove(old.g); }
   r.tag.nm.textContent = r.nick;
   r.hold = typeof pr.hold === 'string' ? pr.hold : null;
+  r.pig = pr.pig && typeof pr.pig.to === 'string' && (pr.pig.r === 'c' || pr.pig.r === 'r') ? { to: pr.pig.to, r: pr.pig.r } : null;
   r.act = ACTS.includes(pr.act) ? pr.act : '';
   r.seat = typeof pr.seat === 'string' && seatById.has(pr.seat) ? pr.seat : null;
   r.ride = pr.ride && cartById.has(pr.ride.id) && (pr.ride.s === 0 || pr.ride.s === 1) ? { id: pr.ride.id, s: pr.ride.s } : null;
@@ -636,6 +654,7 @@ function removeRemote(id) {
   scene.remove(r.av.g); r.tag.el.remove(); remotes.delete(id);
   if (following === id) setFollow(null);
   if (myHold === id) setHold(null);
+  if (myPig && myPig.to === id) setPig(null);
 }
 
 // ---------- holding hands ----------
@@ -689,6 +708,41 @@ function updateHoldUi() {
   btn.setAttribute('aria-pressed', String(state === 'holding' || state === 'wait'));
   btn.classList.toggle('pulse', state === 'offer');
   toast.textContent = msg; toast.hidden = !msg;
+}
+// ---------- piggyback ----------
+// Like holding hands it takes two: presence.pig = { to: their peer label, r: 'c' (I carry) or 'r' (I ride) };
+// it starts when the two point at each other with opposite parts.
+let myPig = null;
+function setPig(pg) {
+  myPig = pg;
+  if (pg) { if (myHold) setHold(null); if (following) setFollow(null); if (me.act) standUp(); me.seat = null; }
+  if (room && entered) room.presence({ pig: pg }).catch(() => {});
+}
+const pigWith = () => {
+  if (!myPig || !myPeer) return null;
+  const r = remotes.get(myPig.to);
+  return r && r.pig && r.pig.to === myPeer && r.pig.r !== myPig.r ? r : null;
+};
+function pigAsker() {
+  if (!myPeer) return null;
+  for (const [id, r] of remotes) if (r.pig && r.pig.to === myPeer && Math.hypot(r.x - me.x, r.z - me.z) < 4) return [id, r];
+  return null;
+}
+function togglePig(role) {
+  if (!entered || me.ride) return;
+  closeMoves();
+  if (myPig) { setPig(null); return; }
+  const a = pigAsker();
+  if (a) { setPig({ to: a[0], r: a[1].pig.r === 'c' ? 'r' : 'c' }); return; }
+  const n = nearest(3);
+  if (n) setPig({ to: n, r: role }); else flash('Stand next to them first');
+}
+// a remote player's piggyback partner (another remote or me) and their part, when both agree
+function remotePig(r) {
+  if (!r.pig) return null;
+  if (r.pig.to === myPeer) return myPig && myPig.to === r.id && myPig.r !== r.pig.r ? { role: r.pig.r, o: me } : null;
+  const o = remotes.get(r.pig.to);
+  return o && o.pig && o.pig.to === r.id && o.pig.r !== r.pig.r ? { role: r.pig.r, o } : null;
 }
 // raise the arm on the partner's side so the hands meet
 function reachArm(av, ry, fromX, fromZ, toX, toZ) {
@@ -794,7 +848,7 @@ function sendPresence(force) {
   if (!force && now - lastSent < 90) return;
   const driving = me.ride && me.ride.s === 0 ? cartById.get(me.ride.id) : null;
   const st = { nick, color, x: +me.x.toFixed(2), z: +me.z.toFixed(2), ry: +me.ry.toFixed(2), hold: myHold, g: gender,
-    act: ACTS.includes(me.act) ? me.act : null, seat: me.seat, ride: me.ride, cp: driving ? [r2(driving.x), r2(driving.z), r2(driving.ry)] : null };
+    act: ACTS.includes(me.act) ? me.act : null, seat: me.seat, ride: me.ride, pig: myPig, cp: driving ? [r2(driving.x), r2(driving.z), r2(driving.ry)] : null };
   const key = JSON.stringify(st);
   if (!force && key === lastKey) return;
   lastKey = key; lastSent = now;
@@ -894,7 +948,9 @@ addEventListener('keydown', (e) => {
   if (typing()) return;
   if (e.key === 'Enter' && entered) { e.preventDefault(); $('say').focus(); return; }
   if (e.code === 'KeyH' && entered) { sendHeart(); return; }
-  if (e.code === 'KeyG' && entered) { toggleHold(); return; }
+  if (e.code === 'KeyG' && entered) { if (myPig) setPig(null); toggleHold(); return; }
+  if (e.code === 'KeyB' && entered && !e.repeat) { togglePig('c'); return; }
+  if (e.code === 'KeyN' && entered && !e.repeat) { togglePig('r'); return; }
   if (e.code === 'KeyP') { setFirstPerson(!firstPerson); return; }
   if (e.code === 'Escape') { closeMoves(); return; }
   if (entered && !e.repeat) {
@@ -969,7 +1025,7 @@ function collide(o) {
   o.z = Math.max(W.bounds.minZ, Math.min(W.bounds.maxZ, o.z));
 }
 const tmp = new THREE.Vector3(), clock = new THREE.Clock();
-let t = 0, nearHeartT = 0, holdUiT = 0, wasHolding = false, perfAcc = 0, perfN = 0, quality = 2;
+let t = 0, nearHeartT = 0, holdUiT = 0, wasHolding = false, wasPig = false, perfAcc = 0, perfN = 0, quality = 2;
 function placeTag(tag, obj, now) {
   tmp.set(obj.position.x, obj.position.y + 2.05, obj.position.z).project(camera);
   if (tmp.z > 1 || Math.abs(tmp.x) > 1.2 || Math.abs(tmp.y) > 1.2) { tag.el.style.display = 'none'; return; }
@@ -1000,6 +1056,7 @@ function frame() {
     const kk = 1 - Math.exp(-8 * dt);
     W.placeCart(c, c.x + (tg[0] - c.x) * kk, c.z + (tg[1] - c.z) * kk, lerpAngle(c.ry, tg[2], kk));
   }
+  const pigP = pigWith(), riding = pigP && myPig.r === 'r' ? pigP : null, carrying = pigP && myPig.r === 'c' ? pigP : null;
   let vx = 0, vz = 0, partner = null;
   if (me.ride) {
     const c = cartById.get(me.ride.id);
@@ -1012,12 +1069,15 @@ function frame() {
       const seat = W.cartSeat(c, me.ride.s);
       me.x = seat.x; me.z = seat.z; me.ry = c.ry; me.speed = 0; me.lift = seat.y - groundH(me.x, me.z);
     }
+  } else if (riding) {
+    // on their back: sit just behind their shoulders and go where they go
+    me.x = riding.x - Math.sin(riding.ry) * 0.3; me.z = riding.z - Math.cos(riding.ry) * 0.3; me.ry = riding.ry; me.speed = riding.speed; me.lift = null;
   } else {
     if ((ix || iz) && me.act) { standUp(); sendPresence(true); }
     const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
     if (ix || iz) {
       if (following) setFollow(null);
-      const L = Math.max(1, Math.hypot(ix, iz)), sp = W.inPool(me.x, me.z) ? (run ? 2.6 : 1.6) : (run ? 6.5 : 3.2);
+      const L = Math.max(1, Math.hypot(ix, iz)), sp = (W.inPool(me.x, me.z) ? (run ? 2.6 : 1.6) : (run ? 6.5 : 3.2)) * (carrying ? 0.75 : 1);
       vx = (fx * iz + rx * ix) / L * sp; vz = (fz * iz + rz * ix) / L * sp;
     } else if (following && remotes.has(following) && !me.act) {
       const p = remotes.get(following);
@@ -1042,6 +1102,10 @@ function frame() {
     if (!me.act) dribble(me.speed > 0.3 ? (me.x - ox) / dt : 0, me.speed > 0.3 ? (me.z - oz) / dt : 0);
     me.lift = me.seat && seatById.has(me.seat) ? seatById.get(me.seat).y - groundH(me.x, me.z) : null;
   }
+  if (!!pigP !== wasPig) {
+    wasPig = !!pigP;
+    if (pigP) spawnHearts(tmp.set(me.x, me.av.g.position.y + 1.6, me.z).clone(), 6);
+  }
   if (!!partner !== wasHolding) {
     wasHolding = !!partner;
     if (partner) spawnHearts(tmp.set((partner.x + me.x) / 2, me.av.g.position.y, (partner.z + me.z) / 2).clone(), 6);
@@ -1049,7 +1113,7 @@ function frame() {
   me.av.g.position.set(me.x, groundH(me.x, me.z), me.z); me.av.g.rotation.y = me.ry;
   const swimming = !me.ride && W.inPool(me.x, me.z);
   if (swimming && me.act) standUp();
-  animateAvatar(me.av, me.speed, dt, swimming ? (me.speed > 0.3 ? 'swim' : 'tread') : me.act, me.lift);
+  animateAvatar(me.av, me.speed, dt, riding ? 'piggy' : carrying ? 'carry' : swimming ? (me.speed > 0.3 ? 'swim' : 'tread') : me.act, me.lift);
   if (partner) reachArm(me.av, me.ry, me.x, me.z, partner.x, partner.z);
   stepBall(dt);
   stepTennis(dt);
@@ -1069,9 +1133,11 @@ function frame() {
       const mv = Math.hypot(r.x - px, r.z - pz); r.speed = r.speed * 0.8 + (mv / Math.max(dt, 1e-4)) * 0.2;
       if (r.act === 'sit' && r.seat) lift = seatById.get(r.seat).y - groundH(r.x, r.z);
     }
+    const rp = r.ride ? null : remotePig(r);
+    if (rp && rp.role === 'r') { r.x = rp.o.x - Math.sin(rp.o.ry) * 0.3; r.z = rp.o.z - Math.cos(rp.o.ry) * 0.3; r.ry = rp.o.ry; r.speed = rp.o.speed; }
     r.av.g.position.set(r.x, groundH(r.x, r.z), r.z); r.av.g.rotation.y = r.ry;
     const rSwim = !r.ride && W.inPool(r.x, r.z);
-    animateAvatar(r.av, r.speed, dt, r.ride ? (r.ride.s === 0 ? 'drive' : 'ride') : rSwim ? (r.speed > 0.3 ? 'swim' : 'tread') : r.act, lift);
+    animateAvatar(r.av, r.speed, dt, r.ride ? (r.ride.s === 0 ? 'drive' : 'ride') : rp ? (rp.role === 'r' ? 'piggy' : 'carry') : rSwim ? (r.speed > 0.3 ? 'swim' : 'tread') : r.act, lift);
     r.av.racket.visible = TN.inside(r.x, r.z);
     if (partner && r === partner) reachArm(r.av, r.ry, r.x, r.z, me.x, me.z);
     if (Math.hypot(r.x - me.x, r.z - me.z) < 1.7 && now > nearHeartT) {
