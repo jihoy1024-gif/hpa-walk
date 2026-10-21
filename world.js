@@ -104,7 +104,6 @@ function createWorld(canvas) {
     { at: [1225, 707], w: 80, d: 26, phi: 0, h: 3.4, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1 },
     { at: [1237, 792], w: 120, d: 96, phi: 0, h: 9, wall: 'gym', roof: 'gable', rise: 0.12, solar: 1 },
     { at: [1352, 798], w: 104, d: 110, phi: 0, h: 10, wall: 'gym', roof: 'gable', rise: 0.12, roofColor: '#c9c9c5', label: 'Castle Gymnasium' },
-    { at: [1258, 915], w: 196, d: 120, phi: 0, h: 11, wall: 'gym', roof: 'gable', rise: 0.1, roofColor: '#f1f1ee', label: 'Rutgers Tennis Center' },
     { at: [1636, 668], w: 150, d: 116, phi: 30, h: 10, wall: 'gym', roof: 'gable', rise: 0.3, roofColor: '#e9e9e6', name: 'gpac', label: 'Gates Performing Arts Center' },
     { at: [1658, 780], w: 56, d: 46, phi: 25, h: 3.6, wall: 'wood', ends: 'stone', roof: 'hip' },
     // little sheds by the track and baseball field
@@ -210,6 +209,8 @@ function createWorld(canvas) {
   for (const b of BUILDINGS) addPad(b.x, b.z, b.w / 2 + 2.5, b.d / 2 + 2.5, b.rot, 7);
   const POOL = (() => { const [x, z] = P(1352, 673); return { x, z, rot: -33 * RAD }; })();
   addPad(POOL.x, POOL.z, 20, 15, POOL.rot, 8);
+  const TENNIS = (() => { const [x, z] = P(1258, 915); return { x, z, rot: 0, hw: 36.2, hd: 22.2, eave: 7, ridge: 14, ridgeZ: 6 }; })();
+  addPad(TENNIS.x - 3, TENNIS.z, TENNIS.hw + 9, TENNIS.hd + 4, TENNIS.rot, 8);
   const SOLAR_FIELD = (() => { const [x, z] = P(800, -30); return { x, z, rot: 0 }; })();
   const FARM = (() => { const [x, z] = P(575, -20); return { x, z, rot: 0.15 }; })();
   addPad(FARM.x, FARM.z, 22, 14, FARM.rot, 10);
@@ -845,6 +846,143 @@ function createWorld(canvas) {
   }
   BUILDINGS.forEach(building);
 
+  // ---------- Rutgers Tennis Center: walk-in hall with three indoor courts ----------
+  // Outside: cream vertical panels, a tall asymmetric gable roof in dark metal with red-brown trim,
+  // a lattice screen with the tree emblem up in the gable, and a low covered entry with a lattice band.
+  // Inside: white steel trusses, skylight strips and lights, green courts, blue wainscot and dark green curtains.
+  const tennis = { x: TENNIS.x, z: TENNIS.z, rot: TENNIS.rot, hw: TENNIS.hw, hd: TENNIS.hd, floorY: 0, courts: [-18.3, 0, 18.3], netH: 0.914 };
+  (function tennisCenter() {
+    const T = TENNIS, y0 = groundH(T.x, T.z) + 0.06; tennis.floorY = y0;
+    const g = new THREE.Group(); g.position.set(T.x, y0, T.z); g.rotation.y = T.rot; scene.add(g);
+    const hw = T.hw, hd = T.hd, E = T.eave, RH = T.ridge, RZ = T.ridgeZ;
+    const panelTex = canvasTex(256, 256, (c, W2, H2) => {
+      c.fillStyle = '#dcd6c2'; c.fillRect(0, 0, W2, H2);
+      for (let x = 0; x < W2; x += 16) { c.fillStyle = 'rgba(0,0,0,0.08)'; c.fillRect(x, 0, 2, H2); c.fillStyle = 'rgba(255,255,255,0.3)'; c.fillRect(x + 2, 0, 2, H2); }
+      c.fillStyle = 'rgba(80,70,50,0.25)'; c.fillRect(0, H2 - 10, W2, 10);
+    });
+    panelTex.repeat.set(hw / 2, 1.5);
+    const wallMatT = new THREE.MeshStandardMaterial({ map: panelTex, roughness: 0.75 });
+    const trimRed = new THREE.MeshStandardMaterial({ color: C('#7a3d2f'), roughness: 0.7 });
+    const add = (geo, mat, x, y, z, parent) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true; (parent || g).add(m); return m; };
+    const wallBox = (lx, lz, sx, sz, h, mat) => { add(new THREE.BoxGeometry(sx, h, sz), mat || wallMatT, lx, h / 2, lz); const [wx, wz] = toWorld(T, lx, lz); box(wx, wz, sx / 2 + 0.05, sz / 2 + 0.05, T.rot); };
+    // long walls (north/south) and end walls with a 3.4 m doorway in each end
+    wallBox(0, -hd, hw * 2, 0.3, E); wallBox(0, hd, hw * 2, 0.3, E);
+    for (const sx of [-1, 1]) {
+      wallBox(sx * hw, -(hd + 1.7) / 2, 0.3, hd - 1.7, E); wallBox(sx * hw, (hd + 1.7) / 2, 0.3, hd - 1.7, E);
+      add(new THREE.BoxGeometry(0.3, E - 3, 3.4), wallMatT, sx * hw, 3 + (E - 3) / 2, 0);
+    }
+    // gable triangles above the end walls (asymmetric ridge)
+    for (const sx of [-1, 1]) {
+      const sh = new THREE.Shape(); sh.moveTo(-hd, 0); sh.lineTo(hd, 0); sh.lineTo(RZ, RH - E); sh.closePath();
+      const gm = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshStandardMaterial({ map: panelTex, roughness: 0.75, side: THREE.DoubleSide }));
+      gm.rotation.y = -Math.PI / 2; gm.position.set(sx * hw, E, 0); gm.castShadow = true; g.add(gm);
+    }
+    // roof: two metal slopes (dark outside), white ceiling with skylight strips inside
+    const ov = 0.9, kA = (RH - E) / (RZ + hd), kB = (RH - E) / (hd - RZ);
+    const zA = -hd - ov, yA = E - kA * ov, zB = hd + ov, yB = E - kB * ov, Wr = hw + ov;
+    const slopes = [[[Wr, yA, zA], [-Wr, yA, zA], [-Wr, RH, RZ], [Wr, RH, RZ]], [[-Wr, yB, zB], [Wr, yB, zB], [Wr, RH, RZ], [-Wr, RH, RZ]]]; // both wound to face up and out
+    const roofTop = [], ceiling = [];
+    for (const q of slopes) {
+      roofTop.push(q[0], q[1], q[2], q[0], q[2], q[3]);
+      const d = q.map((v) => [v[0], v[1] - 0.25, v[2]]);
+      ceiling.push(d[0], d[1], d[2], d[0], d[2], d[3]);
+    }
+    const metal = new THREE.MeshStandardMaterial({ color: C('#5c6064'), map: seamTex, roughness: 0.5, metalness: 0.35 });
+    add(triGeo(roofTop, 0.5), metal, 0, 0, 0);
+    const skyTex = canvasTex(64, 256, (c, W2, H2) => { c.fillStyle = '#e9ebec'; c.fillRect(0, 0, W2, H2); c.fillStyle = 'rgba(0,0,0,0.08)'; for (let y = 0; y < H2; y += 16) c.fillRect(0, y, W2, 2); c.fillStyle = '#f9fbff'; c.fillRect(18, 0, 28, H2); });
+    const ceilGeo = triGeo(ceiling); { const pa = ceilGeo.attributes.position, uv = []; for (let i = 0; i < pa.count; i++) uv.push(pa.getX(i) / 6, pa.getZ(i) / 6); ceilGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); }
+    add(ceilGeo, new THREE.MeshStandardMaterial({ map: skyTex, side: THREE.BackSide, roughness: 0.8, emissive: C('#8a8d90') }), 0, 0, 0);
+    // red-brown fascia along the eaves and rakes
+    add(new THREE.BoxGeometry(Wr * 2, 0.4, 0.15), trimRed, 0, yA - 0.2, zA);
+    add(new THREE.BoxGeometry(Wr * 2, 0.4, 0.15), trimRed, 0, yB - 0.2, zB);
+    for (const sx of [-1, 1]) for (const [za, ya] of [[zA, yA], [zB, yB]]) {
+      const L = Math.hypot(RZ - za, RH - ya), r = add(new THREE.BoxGeometry(0.15, 0.4, L), trimRed, sx * Wr, (ya + RH) / 2 - 0.15, (za + RZ) / 2);
+      r.rotation.x = -Math.atan2(RH - ya, RZ - za);
+    }
+    // white steel trusses every 6 m
+    const steel = [], white = C('#f1f2f2');
+    const beam = (a, b, t) => { const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2], L = Math.hypot(dx, dy, dz); const geo = new THREE.BoxGeometry(t, t * 1.6, L); geo.rotateX(-Math.atan2(dy, Math.hypot(dx, dz))); geo.rotateY(Math.atan2(dx, dz)); geo.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2); steel.push({ g: geo, c: white }); };
+    for (let x = -hw + 3; x <= hw - 2; x += 6) {
+      beam([x, E - 0.4, -hd + 0.4], [x, RH - 0.5, RZ], 0.35);
+      beam([x, RH - 0.5, RZ], [x, E - 0.4, hd - 0.4], 0.35);
+      beam([x, 0, -hd + 0.4], [x, E - 0.4, -hd + 0.4], 0.4);
+      beam([x, 0, hd - 0.4], [x, E - 0.4, hd - 0.4], 0.4);
+      beam([x, E - 2.2, -hd + 0.4], [x, E + 1.0, -hd + 6], 0.22);
+      beam([x, E - 2.2, hd - 0.4], [x, E + 0.6, hd - 6], 0.22);
+    }
+    for (const z of [-hd + 8, RZ - 1, hd - 7]) beam([-hw + 0.5, z < RZ ? E + (z + hd) * kA - 0.7 : E + (hd - z) * kB - 0.7, z], [hw - 0.5, z < RZ ? E + (z + hd) * kA - 0.7 : E + (hd - z) * kB - 0.7, z], 0.2);
+    const sm = new THREE.Mesh(mergeGeoms(steel), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.3 })); sm.receiveShadow = true; g.add(sm);
+    // light fixtures under the roof
+    const lights = [];
+    for (let x = -hw + 4; x < hw - 3; x += 6) for (const z of [-14, -6, 2, 10, 16]) {
+      const y = (z < RZ ? E + (z + hd) * kA : E + (hd - z) * kB) - 0.75;
+      lights.push({ g: new THREE.BoxGeometry(2.6, 0.12, 0.45).translate(x, y, z), c: C('#ffffff') });
+    }
+    g.add(new THREE.Mesh(mergeGeoms(lights), new THREE.MeshBasicMaterial({ vertexColors: true })));
+    for (const x of [-20, 0, 20]) { const pl = new THREE.PointLight(0xfff6e8, 0.9, 60, 1.6); pl.position.set(x, RH - 2.5, 0); g.add(pl); }
+    // floor: three courts with white lines on a darker green surround
+    const fpx = 26;
+    const floorTex = canvasTex(Math.round(hw * 2 * fpx), Math.round(hd * 2 * fpx), (c, W2, H2) => {
+      c.translate(W2 / 2, H2 / 2); c.scale(fpx, fpx);
+      c.fillStyle = '#356b52'; c.fillRect(-hw, -hd, hw * 2, hd * 2);
+      for (const cx of tennis.courts) {
+        c.fillStyle = '#4c8a63'; c.fillRect(cx - 5.49 - 1.2, -11.885 - 3, 10.97 + 2.4, 23.77 + 6);
+        c.strokeStyle = '#f4f4f0'; c.lineWidth = 0.06;
+        c.strokeRect(cx - 5.485, -11.885, 10.97, 23.77);
+        c.strokeRect(cx - 4.115, -11.885, 8.23, 23.77);
+        c.beginPath(); c.moveTo(cx - 4.115, -6.4); c.lineTo(cx + 4.115, -6.4); c.moveTo(cx - 4.115, 6.4); c.lineTo(cx + 4.115, 6.4); c.moveTo(cx, -6.4); c.lineTo(cx, 6.4);
+        c.moveTo(cx, -11.885); c.lineTo(cx, -11.6); c.moveTo(cx, 11.885); c.lineTo(cx, 11.6); c.stroke();
+      }
+      c.fillStyle = '#3b86b6'; c.fillRect(-hw, -hd, hw * 2, 0.6); c.fillRect(-hw, hd - 0.6, hw * 2, 0.6);
+    });
+    floorTex.wrapS = floorTex.wrapT = THREE.ClampToEdgeWrapping;
+    const fl = add(new THREE.PlaneGeometry(hw * 2, hd * 2).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.85 }), 0, 0.02, 0);
+    fl.castShadow = false;
+    // blue wainscot inside the walls
+    const blue = new THREE.MeshStandardMaterial({ color: C('#3b86b6'), roughness: 0.7, side: THREE.DoubleSide });
+    for (const [w, x, z, ry] of [[hw * 2 - 0.6, 0, -hd + 0.2, 0], [hw * 2 - 0.6, 0, hd - 0.2, Math.PI]]) { const m = add(new THREE.PlaneGeometry(w, 1.8), blue, x, 0.9, z); m.rotation.y = ry; m.castShadow = false; }
+    // dark green curtains between the courts (gaps at both ends to walk through)
+    const curtain = new THREE.MeshStandardMaterial({ color: C('#1f3a2c'), roughness: 0.95, side: THREE.DoubleSide });
+    for (const x of [-9.15, 9.15]) { const m = add(new THREE.PlaneGeometry(30, 3.4), curtain, x, 1.7, 0); m.rotation.y = Math.PI / 2; const [wx, wz] = toWorld(T, x, 0); box(wx, wz, 0.15, 15, T.rot); }
+    // nets
+    const netTex = canvasTex(64, 64, (c) => { c.strokeStyle = 'rgba(20,20,20,0.9)'; c.lineWidth = 2; for (let i = 0; i <= 64; i += 6) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, 64); c.stroke(); c.beginPath(); c.moveTo(0, i); c.lineTo(64, i); c.stroke(); } });
+    netTex.repeat.set(30, 3);
+    const netMat = new THREE.MeshStandardMaterial({ map: netTex, transparent: true, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 1 });
+    const postMatT = new THREE.MeshStandardMaterial({ color: C('#2c3a33'), roughness: 0.5, metalness: 0.5 });
+    for (const cx of tennis.courts) {
+      add(new THREE.PlaneGeometry(12.8, 0.9), netMat, cx, 0.5, 0);
+      add(new THREE.BoxGeometry(12.8, 0.06, 0.04), new THREE.MeshStandardMaterial({ color: C('#f4f4f0') }), cx, 0.94, 0);
+      for (const sx of [-6.4, 6.4]) { add(new THREE.CylinderGeometry(0.05, 0.05, 1.07, 8), postMatT, cx + sx, 0.535, 0); const [wx, wz] = toWorld(T, cx + sx, 0); colliders.circles.push({ x: wx, z: wz, r: 0.2 }); }
+      const [nx, nz] = toWorld(T, cx, 0); box(nx, nz, 6.4, 0.08, T.rot);
+      // umpire-style bench by each net
+      const bn = add(new THREE.BoxGeometry(1.6, 0.45, 0.45), new THREE.MeshStandardMaterial({ color: C('#9a6b45'), roughness: 0.8 }), cx + 7.6, 0.22, 1.2);
+    }
+    // covered entry along the west end: dark lean-to roof, lattice band with the name
+    const ent = new THREE.Group(); ent.position.set(-hw, 0, 0); g.add(ent);
+    const roofE = add(new THREE.BoxGeometry(5.4, 0.18, 34), metal, -2.7, 3.7, 0, ent); roofE.rotation.z = 0.12;
+    add(new THREE.BoxGeometry(0.15, 0.35, 34), trimRed, -5.4, 3.35, 0, ent);
+    for (let z = -16; z <= 16; z += 8) { add(new THREE.BoxGeometry(0.25, 3.2, 0.25), trimRed, -5.2, 1.6, z, ent); const [wx, wz] = toWorld(T, -hw - 5.2, z); colliders.circles.push({ x: wx, z: wz, r: 0.25 }); }
+    const latTex = canvasTex(128, 32, (c, W2, H2) => { c.fillStyle = 'rgba(0,0,0,0)'; c.clearRect(0, 0, W2, H2); c.fillStyle = '#6e5b4c'; for (let x = 0; x < W2; x += 8) c.fillRect(x, 0, 3, H2); for (let y = 0; y < H2; y += 8) c.fillRect(0, y, W2, 3); });
+    latTex.repeat.set(14, 1);
+    const latMat = new THREE.MeshStandardMaterial({ map: latTex, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.8 });
+    const band = add(new THREE.PlaneGeometry(34, 1.0), latMat, -5.45, 2.75, 0, ent); band.rotation.y = -Math.PI / 2;
+    const nameTex = canvasTex(1024, 96, (c, W2, H2) => { c.clearRect(0, 0, W2, H2); c.fillStyle = '#f4f2ec'; c.font = 'bold 64px Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('Rutgers Tennis Center', W2 / 2, H2 / 2); });
+    const nm = add(new THREE.PlaneGeometry(9, 0.85), new THREE.MeshBasicMaterial({ map: nameTex, transparent: true }), -5.55, 2.75, 8, ent); nm.rotation.y = -Math.PI / 2; nm.castShadow = false;
+    // lattice screen with the tree emblem high in the west gable
+    const scr = new THREE.Group(); scr.position.set(-hw - 0.35, 0, RZ - 1); scr.rotation.y = -Math.PI / 2; g.add(scr);
+    const shp = new THREE.Shape(); shp.moveTo(-2.2, RH - 6.5); shp.lineTo(2.2, RH - 6.5); shp.lineTo(3.4, RH + 1.2); shp.lineTo(-3.4, RH + 1.2); shp.closePath();
+    const lt2 = latTex.clone(); lt2.needsUpdate = true; lt2.repeat.set(0.9, 1.6);
+    const screenGeo = new THREE.ShapeGeometry(shp); { const pa = screenGeo.attributes.position, uv = []; for (let i = 0; i < pa.count; i++) uv.push(pa.getX(i) / 1.2, pa.getY(i) / 1.2); screenGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); }
+    add(screenGeo, new THREE.MeshStandardMaterial({ map: lt2, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.8 }), 0, 0, 0, scr);
+    const logoTex = canvasTex(128, 128, (c) => {
+      c.clearRect(0, 0, 128, 128); c.fillStyle = '#e9ece9'; c.beginPath(); c.arc(64, 64, 56, 0, Math.PI * 2); c.fill();
+      c.fillStyle = '#3b4a44'; c.fillRect(60, 64, 8, 40);
+      for (let i = 0; i < 14; i++) { const a = -Math.PI + i / 13 * Math.PI; c.beginPath(); c.arc(64 + Math.cos(a) * 30, 56 + Math.sin(a) * 26, 12, 0, Math.PI * 2); c.fill(); }
+      c.strokeStyle = '#3b4a44'; c.lineWidth = 4; c.beginPath(); c.arc(64, 112, 40, Math.PI * 1.15, Math.PI * 1.85); c.stroke();
+    });
+    const logo = add(new THREE.CircleGeometry(1.5, 32), new THREE.MeshStandardMaterial({ map: logoTex, transparent: true, roughness: 0.6 }), 0, RH - 2.4, 0.05, scr); logo.castShadow = false;
+  })();
+
   // ---------- Dowsett Pool: outdoor 25 m pool with deck, coping and a changing-room wing ----------
   (function dowsettPool() {
     const y = groundH(POOL.x, POOL.z);
@@ -1064,7 +1202,8 @@ function createWorld(canvas) {
   }
   function onRoad(x, z, pad) { for (const r of roads) { if (polyDist(x, z, r.pl, r.w) < r.w / 2 + pad) return true; } return false; }
   function onTrack(x, z, pad) { const [lx, lz] = toLocal(TRACK, x, z); return Math.hypot(Math.max(Math.abs(lx) - TL, 0), lz) < R_OUT + pad; }
-  function blocked(x, z, pad) { return onTrack(x, z, pad) || isInBuilding(x, z, pad) || onRoad(x, z, pad); }
+  function inTennis(x, z, pad) { const [lx, lz] = toLocal(TENNIS, x, z); return Math.abs(lx + 3) < TENNIS.hw + 9 + pad && Math.abs(lz) < TENNIS.hd + 2 + pad; }
+  function blocked(x, z, pad) { return onTrack(x, z, pad) || isInBuilding(x, z, pad) || onRoad(x, z, pad) || inTennis(x, z, pad); }
 
   for (const tl of treeLines) {
     const pts = tl.pl.pts, curve = new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0, z)));
@@ -1207,30 +1346,17 @@ function createWorld(canvas) {
     const geo = mergeGeoms(parts);
     const paints = ['#f2f2f0', '#1f2328', '#b23a33', '#8b95a3', '#d8d3c6', '#2f5a8c', '#5b6b4c', '#c9c9c4', '#9a9fa6'];
     const items = [];
-    // event parking on the baseball outfield
-    for (let row = 0; row < 7; row++) for (let i = 0; i < 17; i++) {
-      if (R() < 0.18) continue;
-      const [x, z] = P(884 + i * 7.6 + row * 2, 905 + row * 23);
-      items.push({ x, z, rot: -8 * RAD + (R() - 0.5) * 0.12 });
-    }
-    // paved lot
+    // paved lot: just a few cars
     for (const lxm of [5.5, 17.5, 23, 35]) for (let z = 4; z < pk.hd * 2 - 3; z += 2.6) {
-      if (R() < 0.25) continue;
+      if (R() < 0.9) continue;
       const [x, zz] = toWorld(pk, lxm - pk.hw, z - pk.hd);
       items.push({ x, z: zz, rot: pk.rot + Math.PI / 2 + (lxm % 2 ? 0 : Math.PI) });
     }
     // a few by the buildings
-    for (const [px, py] of [[760, 300], [780, 305], [1240, 600], [1260, 598], [1275, 540], [1530, 880], [1550, 885], [1570, 890], [1590, 892], [1200, 190], [1220, 190]]) { const [x, z] = P(px, py); items.push({ x, z, rot: R() * 6.28 }); }
+    for (const [px, py] of [[760, 300], [1240, 600], [1275, 540], [1550, 885], [1200, 190]]) { const [x, z] = P(px, py); items.push({ x, z, rot: R() * 6.28 }); }
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.45 });
     instanced(geo, mat, items, (d, it) => { d.position.set(it.x, groundH(it.x, it.z) + 0.05, it.z); d.rotation.y = it.rot; }, () => C(paints[(R() * paints.length) | 0]), true);
     items.forEach((it) => colliders.circles.push({ x: it.x, z: it.z, r: 1.5 }));
-    // yellow school bus on Hpa Rd
-    const [bx, bz] = P(1050, 728);
-    const bus = new THREE.Group(); bus.position.set(bx, groundH(bx, bz), bz); bus.rotation.y = 1.25; scene.add(bus);
-    const yellow = new THREE.MeshStandardMaterial({ color: C('#f2b51c'), roughness: 0.5, metalness: 0.2 });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.4, 10), yellow); body.position.y = 1.6; body.castShadow = true; bus.add(body);
-    const glass = new THREE.Mesh(new THREE.BoxGeometry(2.52, 0.7, 8.6), new THREE.MeshStandardMaterial({ color: C('#2a3440'), roughness: 0.2 })); glass.position.set(0, 2.15, -0.4); bus.add(glass);
-    box(bx, bz, 1.4, 5.2, 1.25);
   })();
 
   // ---------- fences and power poles ----------
@@ -1491,8 +1617,9 @@ function createWorld(canvas) {
   const bounds = { minX: -260, maxX: 640, minZ: -340, maxZ: 260 };
 
   const field = { x: TRACK.x, z: TRACK.z, rot: TRACK.rot, halfL: FIELD_L / 2, halfW: FIELD_W / 2, rIn: R_IN, TL, y: groundH(0, 0) };
+  tennis.inside = (x, z) => { const [lx, lz] = toLocal(tennis, x, z); return Math.abs(lx) < tennis.hw - 0.3 && Math.abs(lz) < tennis.hd - 0.3; };
   return { scene, renderer, camera, groundH, colliders, flags, C, spawn, bounds, update, setTime, setQuality, times: TIMES, get timeKey() { return timeKey; },
-    seats, carts, placeCart, cartSeat, field, toLocal, toWorld };
+    seats, carts, placeCart, cartSeat, field, tennis, toLocal, toWorld };
 }
 
 window.HPA = { createWorld };

@@ -136,7 +136,7 @@ body { font-family: var(--body); overflow: hidden; }
     <button class="btn" type="button" data-m="lie">Lie down <kbd>Z</kbd></button>
     <button class="btn" type="button" data-m="hula">Hula <kbd>C</kbd></button>
     <button class="btn" type="button" data-m="wave">Wave <kbd>V</kbd></button>
-    <button class="btn" type="button" data-m="kick">Kick ball <kbd>F</kbd></button>
+    <button class="btn" type="button" data-m="kick">Kick / hit <kbd>F</kbd></button>
     <button class="btn" type="button" data-m="ride">Golf cart <kbd>R</kbd></button>
   </div>
   <div id="toast" class="panel" role="status" hidden></div>
@@ -157,7 +157,6 @@ body { font-family: var(--body); overflow: hidden; }
   <div id="join">
     <div class="card panel" role="dialog" aria-labelledby="joinTitle">
       <h2 id="joinTitle">Where Jiho and Isa met</h2>
-      <p>Hawaiʻi Preparatory Academy, Waimea, at sunset. Anyone who opens this page at the same time stands on the same campus. Walk a lap of the track, or follow the row of Cook pines.</p>
       <div class="field">
         <label for="nick">Name</label>
         <input id="nick" maxlength="16" placeholder="Your name on campus">
@@ -183,7 +182,7 @@ body { font-family: var(--body); overflow: hidden; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
-<script src="world.js?v=8"></script>
+<script src="world.js?v=10"></script>
 <script>
 (() => {
 'use strict';
@@ -264,6 +263,10 @@ function makeAvatar(leiColor, skinIdx, gender) {
   const armL = limb(-0.26, 1.33, fem ? 0.05 : 0.065, 0.5, fem ? skin : cloth, skin, 0.055);
   const armR = limb(0.26, 1.33, fem ? 0.05 : 0.065, 0.5, fem ? skin : cloth, skin, 0.055);
   armL.rotation.z = -0.12; armR.rotation.z = 0.12;
+  const racket = new THREE.Group(); racket.position.set(0, -0.6, 0.03); racket.visible = false; armR.add(racket);
+  add(racket, new THREE.CylinderGeometry(0.016, 0.016, 0.3, 8), std(0x222226, 0.5), 0, -0.12, 0);
+  const rh = add(racket, new THREE.TorusGeometry(0.13, 0.013, 6, 24), std(0x2f6fd0, 0.4), 0, -0.4, 0); rh.scale.y = 1.25;
+  add(racket, new THREE.CircleGeometry(0.12, 20), new THREE.MeshStandardMaterial({ color: 0xf2f2ee, transparent: true, opacity: 0.35, side: THREE.DoubleSide }), 0, -0.4, 0).scale.y = 1.25;
   let skirt = null;
   if (fem) {
     skirt = new THREE.Group(); skirt.position.y = 0.84; p.add(skirt);
@@ -285,7 +288,7 @@ function makeAvatar(leiColor, skinIdx, gender) {
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.08; g.add(shadow);
   g.traverse((o) => { if (o.isMesh && o !== shadow) o.castShadow = true; });
   scene.add(g);
-  return { g, p, lei, legL, legR, armL, armR, skirt, phase: 0, t: Math.random() * 10, kickUntil: 0, gender: fem ? 'f' : 'm' };
+  return { g, p, lei, legL, legR, armL, armR, skirt, racket, phase: 0, t: Math.random() * 10, kickUntil: 0, swingUntil: 0, gender: fem ? 'f' : 'm' };
 }
 // act: '' walking, 'sit', 'lie', 'hula', 'wave', 'drive', 'ride'. lift: seat height above the ground, or null on the ground
 function animateAvatar(a, speed, dt, act, lift) {
@@ -315,6 +318,7 @@ function animateAvatar(a, speed, dt, act, lift) {
     T.lL = s; T.lR = -s; T.aLx = -s * 0.8; T.aRx = s * 0.8;
   }
   if (performance.now() < a.kickUntil) T.lR = -1.2;
+  if (performance.now() < a.swingUntil) { T.aRx = -1.4; T.aRz = 1.0; }
   const k = 1 - Math.exp(-14 * dt), L = (o, key, v) => { o[key] += (v - o[key]) * k; };
   L(a.p.position, 'y', T.py); L(a.p.position, 'x', T.px); L(a.p.rotation, 'x', T.rx); L(a.p.rotation, 'z', T.rz);
   L(a.legL.rotation, 'x', T.lL); L(a.legR.rotation, 'x', T.lR);
@@ -343,6 +347,8 @@ function setFirstPerson(on) {
   camera.near = on ? 0.08 : 0.25; camera.updateProjectionMatrix();
   if (!on && camDist < 3) camDist = 4;
   $('fpBtn').setAttribute('aria-pressed', String(on));
+  if (!on && document.pointerLockElement) document.exitPointerLock();
+  if (on && matchMedia('(pointer: fine)').matches) flash('Move the mouse to look around · click to lock it · Esc to let go');
 }
 
 // ---------- moves, seats, soccer ball, golf carts ----------
@@ -484,6 +490,67 @@ function kick() {
   publishBall();
 }
 
+// tennis in the Rutgers Tennis Center: whoever hits last shares the ball;
+// a ball coming to you on your side of the net is returned automatically, F serves or hits
+const TN = W.tennis, R_T = 0.06;
+const tbMesh = new THREE.Mesh(new THREE.SphereGeometry(R_T, 16, 12), new THREE.MeshStandardMaterial({ color: C('#d9f23c'), roughness: 0.6, emissive: C('#2a3300') }));
+tbMesh.castShadow = true; tbMesh.visible = false; scene.add(tbMesh);
+const tb = { x: TN.x, z: TN.z, y: TN.floorY + R_T, vx: 0, vy: 0, vz: 0, stamp: 0, live: false, hits: 0, bounces: 0, lastHit: 0 };
+const tLocal = (x, z) => W.toLocal(TN, x, z);
+const tToLocalV = (vx, vz) => { const c = Math.cos(TN.rot), sn = Math.sin(TN.rot); return [vx * c - vz * sn, vx * sn + vz * c]; };
+const tToWorldV = (vlx, vlz) => { const c = Math.cos(TN.rot), sn = Math.sin(TN.rot); return [vlx * c + vlz * sn, -vlx * sn + vlz * c]; };
+const courtX = (lx) => TN.courts.reduce((b, c) => (Math.abs(lx - c) < Math.abs(lx - b) ? c : b), TN.courts[0]);
+function publishTennis() {
+  tb.stamp = Math.max(Date.now(), tb.stamp + 1);
+  if (room && entered) room.presence({ t: [r2(tb.x), r2(tb.y), r2(tb.z), r2(tb.vx), r2(tb.vy), r2(tb.vz), tb.hits, tb.live ? 1 : 0, tb.stamp] }).catch(() => {});
+}
+function hitTennis(serve) {
+  const [plx, plz] = tLocal(me.x, me.z);
+  const cx = courtX(plx), side = plz >= 0 ? 1 : -1;
+  if (serve) { tb.x = me.x + Math.sin(me.ry) * 0.4; tb.z = me.z + Math.cos(me.ry) * 0.4; tb.y = TN.floorY + 2.3; tb.hits = 0; }
+  const [blx, blz] = tLocal(tb.x, tb.z), by = tb.y - TN.floorY;
+  const tx = cx + (Math.random() - 0.5) * (serve ? 4 : 7.5), tz = -side * (serve ? 3.5 + Math.random() * 2.5 : 5 + Math.random() * 6);
+  let T = Math.max(0.8, Math.min(1.8, Math.hypot(tx - blx, tz - blz) / 16)), vy = 0;
+  for (let k = 0; k < 14; k++) {
+    vy = (R_T - by + 4.9 * T * T) / T;
+    const vlz = (tz - blz) / T, t0 = vlz ? -blz / vlz : -1;
+    if (t0 <= 0 || t0 >= T || by + vy * t0 - 4.9 * t0 * t0 > 1.3) break;
+    T += 0.12;
+  }
+  [tb.vx, tb.vz] = tToWorldV((tx - blx) / T, (tz - blz) / T);
+  tb.vy = vy; tb.live = true; tb.bounces = 0; tb.hits++; tb.lastHit = performance.now();
+  me.av.swingUntil = performance.now() + 320;
+  if (tb.hits >= 2) flash('Rally ' + tb.hits);
+  publishTennis();
+}
+function tennisAction() {
+  if (!entered || me.ride) return;
+  closeMoves();
+  if (me.act) standUp();
+  const near = Math.hypot(tb.x - me.x, tb.z - me.z) < 2.6 && tb.y < TN.floorY + 2.8;
+  hitTennis(!(tb.live && near));
+}
+function stepTennis(dt) {
+  tbMesh.visible = tb.live || tb.hits > 0;
+  if (!tb.live) return;
+  const [, plz0] = tLocal(tb.x, tb.z);
+  tb.vy -= 9.8 * dt; tb.x += tb.vx * dt; tb.y += tb.vy * dt; tb.z += tb.vz * dt;
+  const fy = TN.floorY + R_T;
+  if (tb.y < fy) { tb.y = fy; tb.vy = Math.abs(tb.vy) * 0.72; tb.vx *= 0.88; tb.vz *= 0.88; tb.bounces++; if (tb.vy < 0.6) tb.vy = 0; }
+  let [lx, lz] = tLocal(tb.x, tb.z), [vlx, vlz] = tToLocalV(tb.vx, tb.vz);
+  if (plz0 * lz < 0 && tb.y < TN.floorY + TN.netH && Math.abs(lx - courtX(lx)) < 6.4) { lz = plz0; vlz = -vlz * 0.25; vlx *= 0.5; }
+  if (Math.abs(lx) > TN.hw - 0.4) { lx = Math.sign(lx) * (TN.hw - 0.4); vlx = -vlx * 0.5; }
+  if (Math.abs(lz) > TN.hd - 0.4) { lz = Math.sign(lz) * (TN.hd - 0.4); vlz = -vlz * 0.5; }
+  [tb.x, tb.z] = W.toWorld(TN, lx, lz); [tb.vx, tb.vz] = tToWorldV(vlx, vlz);
+  if (tb.y <= fy + 0.001 && Math.hypot(tb.vx, tb.vz) < 0.4) { tb.live = false; tb.vx = tb.vz = 0; }
+  tbMesh.position.set(tb.x, tb.y, tb.z);
+  // a ball arriving on your side, within reach, comes back off your racket
+  if (!entered || me.ride || !TN.inside(me.x, me.z) || performance.now() - tb.lastHit < 450 || tb.bounces > 1) return;
+  const [, mz] = tLocal(me.x, me.z), dx = me.x - tb.x, dz = me.z - tb.z;
+  if (Math.sign(mz) === Math.sign(lz) && Math.hypot(dx, dz) < 1.7 && tb.y < TN.floorY + 2.6 && tb.vx * dx + tb.vz * dz > 0) hitTennis(false);
+}
+function kickOrHit() { if (TN.inside(me.x, me.z)) tennisAction(); else kick(); }
+
 // small hint above the bar for whatever is in reach
 function updateCtx() {
   let msg = '';
@@ -491,6 +558,7 @@ function updateCtx() {
   else if (entered) {
     if (me.ride) msg = me.ride.s === 0 ? 'W/S drive · A/D steer · R get out' : 'Along for the ride · R get out';
     else if (me.act) msg = me.act === 'sit' && me.seat ? 'Sitting · move to stand up' : 'Move to stop';
+    else if (TN.inside(me.x, me.z)) msg = tb.live && Math.hypot(tb.x - me.x, tb.z - me.z) < 2.6 ? 'F · hit' : 'F · serve · balls that reach you come back by themselves';
     else if (nearestCart(3.5)) msg = 'R · ride the golf cart';
     else if (Math.hypot(ball.x - me.x, ball.z - me.z) < 1.8) msg = 'F · kick the ball';
     else if (nearestSeat(3)) msg = 'X · sit down';
@@ -505,7 +573,7 @@ movesBtn.onclick = () => { const open = movesMenu.hidden; movesMenu.hidden = !op
 movesMenu.addEventListener('click', (e) => {
   const b = e.target.closest('button[data-m]'); if (!b) return;
   const m = b.dataset.m;
-  if (m === 'kick') kick(); else if (m === 'ride') toggleRide(); else setAct(m);
+  if (m === 'kick') kickOrHit(); else if (m === 'ride') toggleRide(); else setAct(m);
 });
 
 // ---------- remote players ----------
@@ -534,6 +602,12 @@ function upsertRemote(peer) {
   if (r.ride && r.ride.s === 0 && Array.isArray(pr.cp) && pr.cp.length === 3 && pr.cp.every(Number.isFinite)) cartTarget.set(r.ride.id, pr.cp);
   if (Array.isArray(pr.b) && pr.b.length === 7 && pr.b.every(Number.isFinite) && pr.b[6] > ball.stamp && Math.hypot(pr.b[0] - field.x, pr.b[1] - field.z) < 150) {
     [ball.x, ball.z, ball.y, ball.vx, ball.vz, ball.vy, ball.stamp] = pr.b;
+  }
+  if (Array.isArray(pr.t) && pr.t.length === 9 && pr.t.every(Number.isFinite) && pr.t[8] > tb.stamp && Math.hypot(pr.t[0] - TN.x, pr.t[2] - TN.z) < 60) {
+    const prevHits = tb.hits;
+    [tb.x, tb.y, tb.z, tb.vx, tb.vy, tb.vz, tb.hits] = pr.t; tb.live = pr.t[7] === 1; tb.stamp = pr.t[8]; tb.bounces = 0; tb.lastHit = performance.now();
+    if (tb.hits >= 2 && tb.hits !== prevHits) flash('Rally ' + tb.hits);
+    r.av.swingUntil = performance.now() + 320;
   }
   if (pr.say && typeof pr.say.t === 'number' && pr.say.t !== r.lastSay) {
     r.lastSay = pr.say.t; r.tag.say.textContent = safeText(pr.say.txt, 80); r.tag.sayUntil = performance.now() + 7000;
@@ -809,7 +883,7 @@ addEventListener('keydown', (e) => {
   if (entered && !e.repeat) {
     const map = { KeyX: 'sit', KeyZ: 'lie', KeyC: 'hula', KeyV: 'wave' };
     if (map[e.code]) { setAct(map[e.code]); return; }
-    if (e.code === 'KeyF' || e.code === 'Space') { e.preventDefault(); kick(); return; }
+    if (e.code === 'KeyF' || e.code === 'Space') { e.preventDefault(); kickOrHit(); return; }
     if (e.code === 'KeyR') { toggleRide(); return; }
   }
   keys.add(e.code);
@@ -819,8 +893,15 @@ addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
 
 let drag = null;
-canvas.addEventListener('pointerdown', (e) => { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointerdown', (e) => {
+  if (firstPerson && e.pointerType === 'mouse') { try { const r = canvas.requestPointerLock && canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) {} return; }
+  drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId);
+});
 canvas.addEventListener('pointermove', (e) => {
+  if (firstPerson && e.pointerType === 'mouse') {
+    camYaw -= e.movementX * 0.0035; fpPitch = Math.max(-1.3, Math.min(1.3, fpPitch - e.movementY * 0.0035));
+    return;
+  }
   if (!drag || drag.id !== e.pointerId) return;
   camYaw -= (e.clientX - drag.x) * 0.006;
   if (firstPerson) fpPitch = Math.max(-1.3, Math.min(1.3, fpPitch - (e.clientY - drag.y) * 0.004));
@@ -952,6 +1033,8 @@ function frame() {
   animateAvatar(me.av, me.speed, dt, me.act, me.lift);
   if (partner) reachArm(me.av, me.ry, me.x, me.z, partner.x, partner.z);
   stepBall(dt);
+  stepTennis(dt);
+  me.av.racket.visible = TN.inside(me.x, me.z);
   sendPresence(false);
   if (now > holdUiT) { holdUiT = now + 150; updateHoldUi(); updateCtx(); }
 
@@ -969,6 +1052,7 @@ function frame() {
     }
     r.av.g.position.set(r.x, groundH(r.x, r.z), r.z); r.av.g.rotation.y = r.ry;
     animateAvatar(r.av, r.speed, dt, r.ride ? (r.ride.s === 0 ? 'drive' : 'ride') : r.act, lift);
+    r.av.racket.visible = TN.inside(r.x, r.z);
     if (partner && r === partner) reachArm(r.av, r.ry, r.x, r.z, me.x, me.z);
     if (Math.hypot(r.x - me.x, r.z - me.z) < 1.7 && now > nearHeartT) {
       nearHeartT = now + 2600;
