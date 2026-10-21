@@ -182,7 +182,7 @@ body { font-family: var(--body); overflow: hidden; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
-<script src="world.js?v=13"></script>
+<script src="world.js?v=14"></script>
 <script>
 (() => {
 'use strict';
@@ -1105,8 +1105,15 @@ function frame() {
     camera.lookAt(camera.position.x + dx * cp, eyeY + Math.sin(fpPitch), camera.position.z + dz * cp);
   } else {
     const head = tmp.set(me.x, me.av.g.position.y + 1.4, me.z);
-    const cx = head.x + Math.sin(camYaw) * Math.cos(camPitch) * camDist, cz = head.z + Math.cos(camYaw) * Math.cos(camPitch) * camDist;
-    camera.position.set(cx, Math.max(head.y + Math.sin(camPitch) * camDist, groundH(cx, cz) + 0.6), cz);
+    // indoors (dining hall, union, gym) the camera pulls in so it stays under the ceiling and inside the walls
+    const room = W.roomAt(me.x, me.z);
+    let dist = camDist;
+    if (room) for (; dist > 1.2; dist -= 0.25) {
+      const qx = head.x + Math.sin(camYaw) * Math.cos(camPitch) * dist, qz = head.z + Math.cos(camYaw) * Math.cos(camPitch) * dist;
+      if (room.contains(qx, qz, 0.35) && head.y + Math.sin(camPitch) * dist < room.y0 + room.top - 0.3) break;
+    }
+    const cx = head.x + Math.sin(camYaw) * Math.cos(camPitch) * dist, cz = head.z + Math.cos(camYaw) * Math.cos(camPitch) * dist;
+    camera.position.set(cx, Math.min(room ? room.y0 + room.top - 0.3 : Infinity, Math.max(head.y + Math.sin(camPitch) * dist, groundH(cx, cz) + 0.6)), cz);
     camera.lookAt(head);
   }
   if (!entered) camYaw += dt * 0.04;
