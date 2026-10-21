@@ -1363,12 +1363,16 @@ function createWorld(canvas) {
       const pm = new THREE.Mesh(mergeGeoms(parts), trimMat); pm.castShadow = true; can.add(pm);
       const glassFront = new THREE.Mesh(new THREE.PlaneGeometry(cw * 0.8, 3.4), wallMat('glass')); glassFront.position.set(0, 1.8, 0.03); can.add(glassFront);
     }
-    if (b.name === 'ml' || b.name === 'tech') {
-      // building name plaque on the lava-rock end wall
-      const label = b.name === 'ml' ? 'Modern Languages' : 'Technology Center';
-      const tx = canvasTex(256, 32, (c2, W2, H2) => { c2.fillStyle = '#2a2420'; c2.fillRect(0, 0, W2, H2); c2.fillStyle = '#f1ece2'; c2.font = 'bold 19px Arial, sans-serif'; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText(label, W2 / 2, H2 / 2 + 1); });
-      const plaque = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.3), new THREE.MeshStandardMaterial({ map: tx, roughness: 0.6 }));
-      plaque.position.set(b.w / 2 + 0.02, floor + 2.6, hd * 0.4); plaque.rotation.y = Math.PI / 2; g.add(plaque);
+    if (b.label && (b.cls || b.name === 'tech')) {
+      // small name plaque on the lava-rock end wall, as on the Modern Language Building by the flags
+      const label = b.label;
+      const tx = canvasTex(256, 32, (c2, W2, H2) => {
+        c2.fillStyle = '#2a2420'; c2.fillRect(0, 0, W2, H2); c2.fillStyle = '#f1ece2'; c2.textAlign = 'center'; c2.textBaseline = 'middle';
+        let fs = 19; c2.font = 'bold ' + fs + 'px Arial, sans-serif'; while (fs > 10 && c2.measureText(label).width > W2 - 12) { fs--; c2.font = 'bold ' + fs + 'px Arial, sans-serif'; }
+        c2.fillText(label, W2 / 2, H2 / 2 + 1);
+      });
+      const plaque = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.19), new THREE.MeshStandardMaterial({ map: tx, roughness: 0.6 }));
+      plaque.position.set(-b.w / 2 - 0.03, floor + 2.2, -hd * 0.5); plaque.rotation.y = -Math.PI / 2; g.add(plaque);
     }
     scene.add(g);
     const [cx, cz] = toWorld(b, 0, deckDepth / 2);
@@ -2268,17 +2272,21 @@ function createWorld(canvas) {
 
   // ---------- name signs: lava-rock base, dark board, cream letters ----------
   function sign(x, z, rot, text, wide) {
-    const w = wide ? 5.2 : 3.4, y = groundH(x, z);
+    const w = wide ? 2.6 : 1.8, y = groundH(x, z);
     const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = rot; scene.add(g);
-    const base = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.7, 0.6), wallMat('stone')); base.position.y = 0.35; base.castShadow = true; g.add(base);
-    const tx = canvasTex(512, 96, (c, W2, H2) => { c.fillStyle = '#2b2018'; c.fillRect(0, 0, W2, H2); c.strokeStyle = '#c9b48a'; c.lineWidth = 4; c.strokeRect(6, 6, W2 - 12, H2 - 12); c.fillStyle = '#f1e9d6'; c.font = 'bold ' + (text.length > 22 ? 34 : 42) + 'px Georgia, serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, W2 / 2, H2 / 2 + 2); });
+    const base = new THREE.Mesh(new THREE.BoxGeometry(w + 0.2, 0.4, 0.4), wallMat('stone')); base.position.y = 0.2; base.castShadow = true; g.add(base);
+    const tx = canvasTex(512, 96, (c, W2, H2) => {
+      c.fillStyle = '#2b2018'; c.fillRect(0, 0, W2, H2); c.strokeStyle = '#c9b48a'; c.lineWidth = 4; c.strokeRect(6, 6, W2 - 12, H2 - 12);
+      let fs = 42; c.font = 'bold ' + fs + 'px Georgia, serif'; while (fs > 18 && c.measureText(text).width > W2 - 44) { fs -= 2; c.font = 'bold ' + fs + 'px Georgia, serif'; }
+      c.fillStyle = '#f1e9d6'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(text, W2 / 2, H2 / 2 + 2);
+    });
     const face = new THREE.MeshStandardMaterial({ map: tx, roughness: 0.7 }), edge = new THREE.MeshStandardMaterial({ color: C('#2b2018'), roughness: 0.7 });
-    const board = new THREE.Mesh(new THREE.BoxGeometry(w, w * 96 / 512, 0.12), [edge, edge, edge, edge, face, face]);
-    board.position.y = 0.7 + w * 48 / 512 + 0.05; board.castShadow = true; g.add(board);
-    box(x, z, w / 2 + 0.3, 0.4, rot);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(w, w * 96 / 512, 0.08), [edge, edge, edge, edge, face, face]);
+    board.position.y = 0.4 + w * 48 / 512 + 0.04; board.castShadow = true; g.add(board);
+    box(x, z, w / 2 + 0.15, 0.25, rot);
   }
   for (const b of BUILDINGS) {
-    if (!b.label) continue;
+    if (!b.label || b.cls || b.name === 'tech') continue;
     const [x, z] = toWorld(b, b.name === 'chapel' ? b.w / 2 + 2 : b.name === 'ml' ? b.w / 4 : -b.w / 4, b.d / 2 + 6);
     sign(x, z, b.rot, b.label, b.label.length > 18);
   }
