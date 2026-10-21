@@ -2465,28 +2465,38 @@ function createWorld(canvas) {
 
   // ---------- distant landmarks ----------
   const hazeUniforms = { uSun: { value: sunDir }, uSunCol: { value: new THREE.Color() }, uAmb: { value: new THREE.Color() }, uHaze: { value: new THREE.Color() }, uHazeAmt: { value: 0.45 } };
-  const farMat = new THREE.ShaderMaterial({
-    vertexColors: true, fog: false, uniforms: hazeUniforms,
-    vertexShader: 'varying vec3 vC; varying vec3 vN; void main(){ vC = color; vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `uniform vec3 uSun, uSunCol, uAmb, uHaze; uniform float uHazeAmt; varying vec3 vC; varying vec3 vN;
-      void main(){ float l = max(dot(normalize(vN), uSun), 0.0); vec3 c = vC * (0.35 + uAmb + uSunCol * l * 1.4); c = mix(c, uHaze, uHazeAmt);
+  // distant mountains light themselves and fade into the haze colour, more so low down and the farther they are
+  const makeFarMat = (extra) => new THREE.ShaderMaterial({
+    vertexColors: true, fog: false, uniforms: Object.assign({ uExtra: { value: extra } }, hazeUniforms),
+    vertexShader: 'varying vec3 vC; varying vec3 vN; varying float vY; void main(){ vC = color; vN = normalize(mat3(modelMatrix) * normal); vY = (modelMatrix * vec4(position, 1.0)).y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform vec3 uSun, uSunCol, uAmb, uHaze; uniform float uHazeAmt, uExtra; varying vec3 vC; varying vec3 vN; varying float vY;
+      void main(){ float l = max(dot(normalize(vN), uSun), 0.0); vec3 c = vC * (0.35 + uAmb + uSunCol * l * 1.4);
+      c = mix(c, uHaze, clamp(uHazeAmt + uExtra + (1.0 - smoothstep(-250.0, 450.0, vY)) * 0.3, 0.0, 0.96));
       gl_FragColor = vec4(c, 1.0);
       #include <tonemapping_fragment>
       #include <encodings_fragment>
       }`,
   });
+  const farMat = makeFarMat(0);
   // Mauna Kea, 1/5 scale so it keeps its true angular size from Waimea (bearing ~120°)
   (function maunaKea() {
     // broad shield that steepens toward a summit dotted with cinder cones
-    const prof = []; for (let i = 0; i <= 60; i++) { const t = i / 60; prof.push(new THREE.Vector2(5200 * (1 - t), 700 * Math.pow(Math.sin(t * Math.PI / 2), 1.6))); }
-    const geo = new THREE.LatheGeometry(prof, 128);
+    const prof = []; for (let i = 0; i <= 90; i++) { const t = i / 90; prof.push(new THREE.Vector2(5200 * (1 - t), 700 * Math.pow(Math.sin(t * Math.PI / 2), 1.6))); }
+    const geo = new THREE.LatheGeometry(prof, 192);
     const p = geo.attributes.position, col = new Float32Array(p.count * 3), c = new THREE.Color();
-    const low = C('#4f5a3c'), mid = C('#5a4a4a'), high = C('#6a5150'), snow = C('#f6f5f6');
+    const low = C('#4f5a3c'), mid = C('#5a4a4a'), high = C('#6a5150'), snow = C('#f6f5f6'), cinder = C('#7d4a3a');
+    const r = rng(71), cones = [];
+    for (let k = 0; k < 22; k++) { const a = r() * Math.PI * 2, d = 900 + r() * 2300; cones.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, h: 16 + r() * 30, rad: 110 + r() * 90 }); }
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), z = p.getZ(i); let y = p.getY(i); const a = Math.atan2(z, x);
       if (y > 520) y += (Math.sin(a * 9) * 14 + Math.sin(a * 23 + 1) * 9 + Math.sin(a * 41) * 5) * smooth(520, 700, y);
+      // gullies cut down the flanks, deepest mid-slope
+      const gul = Math.pow(Math.abs(Math.sin(a * 26 + Math.sin(a * 5) * 2.5)), 4) * smooth(120, 380, y) * (1 - smooth(540, 680, y));
+      y -= gul * 10;
+      let cw = 0;
+      for (const cn of cones) { const q = ((x - cn.x) * (x - cn.x) + (z - cn.z) * (z - cn.z)) / (cn.rad * cn.rad); if (q < 4) { const w = Math.exp(-q * 1.6); y += cn.h * w; cw = Math.max(cw, w); } }
       p.setY(i, y);
-      c.copy(low).lerp(mid, smooth(120, 420, y)).lerp(high, smooth(420, 600, y));
+      c.copy(low).lerp(mid, smooth(120, 420, y)).lerp(high, smooth(420, 600, y)).lerp(cinder, cw * 0.8).multiplyScalar(1 - gul * 0.18);
       if (y > 590 + Math.sin(a * 7) * 22 + Math.sin(a * 19) * 12) c.copy(snow);
       col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
     }
@@ -2495,6 +2505,36 @@ function createWorld(canvas) {
     const m = new THREE.Mesh(geo, farMat);
     const b = 122 * RAD; m.position.set(Math.sin(b) * 8000, -60, -Math.cos(b) * 8000); scene.add(m);
   })();
+  // a shield volcano at its true angular size from Waimea: a broad dome stretched along its rift zones, lava-dark,
+  // ragged on the skyline, a few cones near the top; its foot sits below the far ground and fades into the haze
+  function shield({ brg, dist, R, top, stretch, axis, cols, bumps, caldera, seed, extra }) {
+    const prof = []; for (let i = 0; i <= 64; i++) { const t = i / 64; prof.push(new THREE.Vector2(R * (1 - t), -380 + (top + 380) * (1 - Math.pow(1 - t, 1.8)))); }
+    const geo = new THREE.LatheGeometry(prof, 160);
+    const p = geo.attributes.position, col = new Float32Array(p.count * 3), c = new THREE.Color(), r = rng(seed);
+    const cones = []; for (let k = 0; k < bumps; k++) { const a = r() * Math.PI * 2, d = R * (0.05 + r() * 0.4); cones.push({ x: Math.cos(a) * d, z: Math.sin(a) * d, h: 14 + r() * 26, rad: R * (0.03 + r() * 0.025) }); }
+    const [lo, mid, hi] = cols.map(C);
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), z = p.getZ(i), a = Math.atan2(z, x), t = 1 - Math.hypot(x, z) / R;
+      let y = p.getY(i);
+      y += (Math.sin(a * 11 + seed) * 0.5 + Math.sin(a * 29 + seed * 2) * 0.3 + Math.sin(a * 53) * 0.2) * 14 * smooth(0.45, 1, t);
+      if (caldera) y -= caldera * smooth(0.9, 0.99, t);
+      for (const cn of cones) { const q = ((x - cn.x) * (x - cn.x) + (z - cn.z) * (z - cn.z)) / (cn.rad * cn.rad); if (q < 4) y += cn.h * Math.exp(-q * 1.6); }
+      p.setY(i, y);
+      const flow = 0.86 + 0.14 * Math.sin(a * 17 + Math.sin(a * 4 + seed) * 3);
+      c.copy(lo).lerp(mid, smooth(-150, top * 0.55, y)).lerp(hi, smooth(top * 0.55, top, y)).multiplyScalar(flow);
+      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.scale(stretch, 1, 1); geo.rotateY(axis);
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, makeFarMat(extra));
+    const b = brg * RAD; m.position.set(Math.sin(b) * dist, 0, -Math.cos(b) * dist); scene.add(m);
+  }
+  // Mauna Loa, due south past the saddle: the long, low dome with its summit caldera
+  shield({ brg: 174, dist: 13000, R: 6400, top: 700, stretch: 1.35, axis: Math.PI / 4, cols: ['#46503a', '#4d4645', '#5c514d'], bumps: 6, caldera: 22, seed: 5, extra: 0.05 });
+  // Hualālai to the south-west, nearer and smaller, its top crowded with cones
+  shield({ brg: 210, dist: 8800, R: 3200, top: 345, stretch: 1.4, axis: -Math.PI / 4, cols: ['#42513a', '#4a4a3f', '#55504a'], bumps: 14, caldera: 0, seed: 9, extra: 0 });
+
   // green cinder cones (puʻu) to the north-west
   (function cones() {
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
