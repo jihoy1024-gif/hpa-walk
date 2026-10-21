@@ -72,6 +72,11 @@ body { font-family: var(--body); overflow: hidden; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(236, 79, 134, 0.25); } }
 @media (prefers-reduced-motion: reduce) { .btn.pulse { animation: none; } }
 #toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(104px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 32px); padding: 8px 14px; font-size: 14px; text-align: center; pointer-events: none; }
+#ctx { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(146px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 32px); padding: 6px 12px; font-size: 13px; pointer-events: none; white-space: nowrap; }
+#goal { position: absolute; left: 0; right: 0; top: 28%; text-align: center; font-family: var(--display); font-weight: 700; font-size: clamp(48px, 10vw, 96px); color: var(--foam); text-shadow: 0 4px 30px rgba(236, 79, 134, 0.7); pointer-events: none; }
+.menu { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(3, auto); gap: 6px; padding: 8px; max-width: calc(100% - 32px); }
+.menu .btn { justify-content: space-between; gap: 10px; }
+.menu kbd { font: inherit; font-size: 11px; color: var(--mute); border: 1px solid var(--glass-line); border-radius: 5px; padding: 0 5px; }
 #help { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); font-size: 12px; color: var(--mute); text-shadow: 0 1px 6px rgba(0,0,0,0.6); white-space: nowrap; pointer-events: none; }
 
 #stick { position: absolute; left: calc(24px + env(safe-area-inset-left, 0px)); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); width: 116px; height: 116px; border-radius: 50%; background: rgba(255,255,255,0.10); border: 1px solid var(--glass-line); touch-action: none; }
@@ -103,6 +108,8 @@ body { font-family: var(--body); overflow: hidden; }
   #help { display: none; }
   #say { width: 34vw; }
   .btn .tx { display: none; }
+  .menu { grid-template-columns: repeat(2, auto); }
+  .menu .btn .tx { display: inline; }
 }
 </style>
 </head>
@@ -121,13 +128,24 @@ body { font-family: var(--body); overflow: hidden; }
     <div id="peers" class="panel" aria-live="polite"></div>
   </header>
 
-  <div id="help">WASD / arrows to walk · Shift to run · Drag to look · H heart · G hold hands · Enter to talk</div>
+  <div id="help">WASD walk · Shift run · Drag look · X sit · Z lie down · C hula · V wave · F kick · R golf cart · H heart · G hold hands · Enter talk</div>
+  <div id="ctx" class="panel" role="status" hidden></div>
+  <div id="goal" hidden>Goal!</div>
+  <div id="moves" class="panel menu" hidden>
+    <button class="btn" type="button" data-m="sit">Sit <kbd>X</kbd></button>
+    <button class="btn" type="button" data-m="lie">Lie down <kbd>Z</kbd></button>
+    <button class="btn" type="button" data-m="hula">Hula <kbd>C</kbd></button>
+    <button class="btn" type="button" data-m="wave">Wave <kbd>V</kbd></button>
+    <button class="btn" type="button" data-m="kick">Kick ball <kbd>F</kbd></button>
+    <button class="btn" type="button" data-m="ride">Golf cart <kbd>R</kbd></button>
+  </div>
   <div id="toast" class="panel" role="status" hidden></div>
   <div id="stick" hidden><div id="knob"></div></div>
 
   <div class="hud bottom">
     <form class="bar panel" id="sayForm" autocomplete="off">
       <input id="say" maxlength="80" placeholder="Say something…" aria-label="Speech bubble message">
+      <button class="btn" type="button" id="movesBtn" aria-expanded="false" aria-controls="moves" title="Sit, lie down, hula, wave, kick, golf cart"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4.5" r="2"/><path d="M5 10l4-1.5h6L19 7M12 8.5V14l-3.5 6.5M12 14l3.5 6.5"/></svg><span class="tx">Moves</span></button>
       <button class="btn heart" type="button" id="heartBtn" title="Send a heart (H)"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg><span class="tx">Heart</span></button>
       <button class="btn" type="button" id="holdBtn" aria-pressed="false" disabled title="Hold hands (G): stand close and both press it"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l4-4 3 1 2-2M21 13l-4-4-3 1-4 4a1.4 1.4 0 0 0 2 2l2-2 2 2M7 9l-2 7M17 9l2 7"/></svg><span class="tx" id="holdTx">Hold hands</span></button>
       <button class="btn" type="button" id="followBtn" aria-pressed="false" disabled title="Walk together: stay at their side"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="5" r="2"/><circle cx="16" cy="5" r="2"/><path d="M8 8v6l-2 7M8 14l2 7M16 8v6l-2 7M16 14l2 7M8 10h8"/></svg><span class="tx">Walk together</span></button>
@@ -151,7 +169,7 @@ body { font-family: var(--body); overflow: hidden; }
         </div>
       </div>
       <div class="field">
-        <label id="colorLbl">Shirt color</label>
+        <label id="colorLbl">Lei color</label>
         <div class="swatches" id="swatches" role="radiogroup" aria-labelledby="colorLbl"></div>
       </div>
       <button class="btn" id="go" type="button">Enter campus</button>
@@ -164,12 +182,12 @@ body { font-family: var(--body); overflow: hidden; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
-<script src="world.js"></script>
+<script src="world.js?v=7"></script>
 <script>
 (() => {
 'use strict';
 const $ = (id) => document.getElementById(id);
-const COLORS = ['#ff7a59', '#ec4f86', '#f2c14e', '#2bb3a3', '#3a7bd5', '#9b6dd6'];
+const COLORS = ['#4f8a3a', '#f28cb4', '#f4efe2', '#f2b84b', '#e0533d', '#9b6dd6']; // lei: maile green, pink, white plumeria, ʻilima, red, orchid
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------- world (terrain, campus, sky, light) lives in world.js ----------
@@ -195,50 +213,112 @@ function spawnHearts(pos, n) {
 }
 
 // ---------- avatars ----------
+// Hawaiian dress: white aloha shirt and trousers with a red sash (kāʻei) and an open maile lei for him;
+// a white floral holokū with a ruffled neckline and a flower lei for her.
 const skinTones = [0xe2b08a, 0xc98e66, 0xa8714d, 0xf0c7a4];
-function makeAvatar(color, skinIdx, gender) {
+const floralTex = (() => {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256; const g = cv.getContext('2d');
+  g.fillStyle = '#f7f5ef'; g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = 'rgba(185,180,165,0.55)'; g.lineWidth = 2;
+  for (let i = 0; i < 9; i++) {
+    const x = (i * 97) % 256, y = (i * 61) % 256;
+    for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; g.beginPath(); g.ellipse(x + Math.cos(a) * 14, y + Math.sin(a) * 14, 12, 3, a, 0, Math.PI * 2); g.stroke(); }
+    g.beginPath(); g.moveTo(x, y); g.bezierCurveTo(x + 30, y + 20, x + 10, y + 50, x + 40, y + 70); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 2); return t;
+})();
+function makeAvatar(leiColor, skinIdx, gender) {
   const fem = gender === 'f';
-  const g = new THREE.Group();
-  const shirt = new THREE.MeshStandardMaterial({ color: C(color), roughness: 0.8 });
-  const skin = new THREE.MeshStandardMaterial({ color: C(skinTones[skinIdx % skinTones.length]), roughness: 0.7 });
-  const pants = new THREE.MeshStandardMaterial({ color: C(0x2b3a55), roughness: 0.85 });
-  const hair = new THREE.MeshStandardMaterial({ color: C(0x2a1d17), roughness: 0.6 });
-  const body = new THREE.Mesh(fem ? new THREE.CylinderGeometry(0.17, 0.2, 0.62, 12) : new THREE.CylinderGeometry(0.2, 0.25, 0.62, 12), shirt); body.position.y = 1.07; g.add(body);
-  // a skirt for her, shorts for him
-  const hips = fem ? new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.36, 0.44, 14), shirt) : new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.24, 0.24, 12), pants);
-  hips.position.y = fem ? 0.66 : 0.72; g.add(hips);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 12), skin); head.position.y = 1.6; g.add(head);
-  const hairM = new THREE.Mesh(new THREE.SphereGeometry(0.215, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), hair); hairM.position.y = 1.62; hairM.rotation.x = -0.25; g.add(hairM);
+  const g = new THREE.Group(), p = new THREE.Group(); g.add(p);
+  const std = (c, r, extra) => new THREE.MeshStandardMaterial(Object.assign({ color: C(c), roughness: r }, extra || {}));
+  const cloth = std(0xf7f5ef, 0.8, fem ? { map: floralTex } : {});
+  const skin = std(skinTones[skinIdx % skinTones.length], 0.7);
+  const hair = std(0x2a1d17, 0.6);
+  const lei = std(leiColor, 0.8);
+  const red = std(0xc4242b, 0.7);
+  const add = (parent, geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; };
+  add(p, fem ? new THREE.CylinderGeometry(0.16, 0.19, 0.6, 16) : new THREE.CylinderGeometry(0.2, 0.22, 0.62, 16), cloth, 0, 1.07, 0);
+  if (!fem) { const sh = add(p, new THREE.SphereGeometry(0.205, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), cloth, 0, 1.36, 0); sh.scale.y = 0.35; }
+  add(p, new THREE.CylinderGeometry(0.06, 0.07, 0.12, 10), skin, 0, 1.43, 0);
+  add(p, new THREE.SphereGeometry(0.2, 18, 14), skin, 0, 1.6, 0);
+  const cap = add(p, new THREE.SphereGeometry(0.215, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.42), hair, 0, 1.62, 0); cap.rotation.x = -0.4;
   if (fem) {
-    const back = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.25, 0.62, 14, 1, false, Math.PI * 0.55, Math.PI * 0.9), hair);
-    back.position.set(0, 1.42, -0.01); g.add(back);
-    const capB = new THREE.Mesh(new THREE.SphereGeometry(0.222, 14, 10, Math.PI * 0.55, Math.PI * 0.9, 0, Math.PI * 0.5), hair);
-    capB.position.y = 1.6; g.add(capB);
-    const flower = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: C(0xff6f9c), roughness: 0.7 }));
-    flower.position.set(0.17, 1.68, 0.06); g.add(flower);
+    add(p, new THREE.CylinderGeometry(0.2, 0.25, 0.62, 16, 1, false, Math.PI * 0.55, Math.PI * 0.9), hair, 0, 1.42, -0.01);
+    add(p, new THREE.SphereGeometry(0.222, 16, 10, Math.PI * 0.55, Math.PI * 0.9, 0, Math.PI * 0.5), hair, 0, 1.6, 0);
+    add(p, new THREE.SphereGeometry(0.06, 10, 8), std(0xffffff, 0.6), 0.17, 1.68, 0.06); // plumeria behind the ear
+    add(p, new THREE.SphereGeometry(0.025, 6, 6), std(0xf2c14e, 0.6), 0.2, 1.69, 0.09);
   }
   const eyeM = new THREE.MeshBasicMaterial({ color: 0x1b1420 });
-  [-0.07, 0.07].forEach((x) => { const e = new THREE.Mesh(new THREE.SphereGeometry(0.025, 6, 6), eyeM); e.position.set(x, 1.62, 0.18); g.add(e); });
-  const lei = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.05, 6, 18), new THREE.MeshStandardMaterial({ color: C(0xff9ec3), roughness: 0.8 }));
-  lei.rotation.x = Math.PI / 2 - 0.2; lei.position.set(0, 1.36, 0.02); g.add(lei);
-  const limb = (r, len, mat) => { const p = new THREE.Group(); const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.85, len, 8), mat); m.position.y = -len / 2; p.add(m); return p; };
-  const legL = limb(fem ? 0.07 : 0.085, 0.66, fem ? skin : pants), legR = limb(fem ? 0.07 : 0.085, 0.66, fem ? skin : pants);
-  legL.position.set(-0.11, 0.68, 0); legR.position.set(0.11, 0.68, 0); g.add(legL, legR);
-  const armL = limb(0.06, 0.56, skin), armR = limb(0.06, 0.56, skin);
-  armL.position.set(-0.27, 1.33, 0); armR.position.set(0.27, 1.33, 0); armL.rotation.z = -0.12; armR.rotation.z = 0.12; g.add(armL, armR);
+  [-0.07, 0.07].forEach((x) => add(p, new THREE.SphereGeometry(0.025, 6, 6), eyeM, x, 1.62, 0.18));
+  // limbs hang from pivot groups so poses can swing them
+  const limb = (x, y, r, len, mat, endMat, endR) => {
+    const pv = new THREE.Group(); pv.position.set(x, y, 0); p.add(pv);
+    add(pv, new THREE.CylinderGeometry(r, r * 0.9, len, 10), mat, 0, -len / 2, 0);
+    if (endMat) add(pv, new THREE.SphereGeometry(endR, 10, 8), endMat, 0, -len - endR * 0.6, 0);
+    return pv;
+  };
+  const legMat = fem ? skin : cloth;
+  const legL = limb(-0.105, 0.7, fem ? 0.06 : 0.09, 0.62, legMat), legR = limb(0.105, 0.7, fem ? 0.06 : 0.09, 0.62, legMat);
+  [legL, legR].forEach((l) => add(l, new THREE.BoxGeometry(0.1, 0.06, 0.22), skin, 0, -0.66, 0.05)); // bare feet
+  const armL = limb(-0.26, 1.33, fem ? 0.05 : 0.065, 0.5, fem ? skin : cloth, skin, 0.055);
+  const armR = limb(0.26, 1.33, fem ? 0.05 : 0.065, 0.5, fem ? skin : cloth, skin, 0.055);
+  armL.rotation.z = -0.12; armR.rotation.z = 0.12;
+  let skirt = null;
+  if (fem) {
+    skirt = new THREE.Group(); skirt.position.y = 0.84; p.add(skirt);
+    const skMat = cloth.clone(); skMat.side = THREE.DoubleSide;
+    add(skirt, new THREE.CylinderGeometry(0.19, 0.43, 0.82, 28, 1, true), skMat, 0, -0.41, 0);
+    for (let i = 0; i < 20; i++) { const a = i / 20 * Math.PI * 2; add(p, new THREE.SphereGeometry(0.05, 8, 6), cloth, Math.cos(a) * 0.19, 1.34 + Math.sin(a * 3) * 0.008, Math.sin(a) * 0.17).scale.set(1, 0.7, 1); }
+    for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2, dip = Math.max(0, Math.sin(a)) * 0.1; add(p, new THREE.SphereGeometry(0.048, 8, 6), lei, Math.cos(a) * 0.2, 1.3 - dip, Math.sin(a) * 0.17 + 0.02).scale.set(1, 0.75, 1); }
+  } else {
+    add(p, new THREE.CylinderGeometry(0.225, 0.215, 0.26, 16), cloth, 0, 0.74, 0);
+    const sash = add(p, new THREE.TorusGeometry(0.225, 0.04, 8, 28), red, 0, 0.84, 0); sash.rotation.x = Math.PI / 2; sash.scale.z = 1.6;
+    add(p, new THREE.SphereGeometry(0.055, 10, 8), red, -0.2, 0.84, 0.1);
+    add(p, new THREE.BoxGeometry(0.15, 0.48, 0.03), red, -0.21, 0.6, 0.11).rotation.z = 0.15;
+    add(p, new THREE.BoxGeometry(0.12, 0.38, 0.03), red, -0.16, 0.64, 0.13).rotation.z = -0.1;
+    const curve = new THREE.CatmullRomCurve3([[-0.11, 0.92, 0.2], [-0.17, 1.15, 0.2], [-0.16, 1.36, 0.07], [0, 1.42, -0.15], [0.16, 1.36, 0.07], [0.17, 1.15, 0.2], [0.11, 0.92, 0.2]].map((v) => new THREE.Vector3(...v)));
+    add(p, new THREE.TubeGeometry(curve, 48, 0.03, 6), lei, 0, 0, 0);
+    for (let i = 0; i <= 26; i++) { const q = curve.getPointAt(i / 26); add(p, new THREE.SphereGeometry(0.03, 6, 4), lei, q.x + (i % 2 ? 0.02 : -0.02), q.y, q.z + 0.01).scale.set(0.8, 1.6, 0.6); }
+  }
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.4, 16), new THREE.MeshBasicMaterial({ color: 0x23301c, transparent: true, opacity: 0.12, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.08; g.add(shadow);
   g.traverse((o) => { if (o.isMesh && o !== shadow) o.castShadow = true; });
   scene.add(g);
-  return { g, shirt, legL, legR, armL, armR, phase: 0, gender: fem ? 'f' : 'm' };
+  return { g, p, lei, legL, legR, armL, armR, skirt, phase: 0, t: Math.random() * 10, kickUntil: 0, gender: fem ? 'f' : 'm' };
 }
-function animateAvatar(a, speed, dt) {
-  const mv = Math.min(1, speed / 3);
-  a.phase += dt * (4 + speed * 2.2) * (mv > 0.05 ? 1 : 0);
-  const s = Math.sin(a.phase) * 0.65 * mv;
-  a.legL.rotation.x = s; a.legR.rotation.x = -s; a.armL.rotation.x = -s * 0.8; a.armR.rotation.x = s * 0.8;
-  a.armL.rotation.z = -0.12; a.armR.rotation.z = 0.12;
-  if (mv <= 0.05) { a.legL.rotation.x *= 0.8; a.legR.rotation.x *= 0.8; }
+// act: '' walking, 'sit', 'lie', 'hula', 'wave', 'drive', 'ride'. lift: seat height above the ground, or null on the ground
+function animateAvatar(a, speed, dt, act, lift) {
+  a.t += dt;
+  const T = { py: 0, px: 0, rx: 0, rz: 0, lL: 0, lR: 0, aLx: 0, aRx: 0, aLz: -0.12, aRz: 0.12, sk: 0 };
+  if (act === 'sit' || act === 'drive' || act === 'ride') {
+    const seated = lift != null;
+    T.py = (seated ? lift : 0.1) - 0.68;
+    T.lL = T.lR = seated ? -1.4 : -1.5;
+    T.sk = -1.2;
+    if (act === 'drive') { T.aLx = T.aRx = -1.05; T.aLz = -0.05; T.aRz = 0.05; }
+    else if (seated) { T.aLx = T.aRx = -0.5; }
+    else { T.aLx = T.aRx = 0.45; T.aLz = -0.4; T.aRz = 0.4; T.rx = -0.12; }
+  } else if (act === 'lie') {
+    T.rx = -Math.PI / 2; T.py = 0.24; T.aLz = -0.3; T.aRz = 0.3; T.lL = 0.05; T.lR = -0.05;
+  } else if (act === 'hula') {
+    const s = Math.sin(a.t * 3.2), w = Math.sin(a.t * 1.6);
+    T.px = s * 0.07; T.rz = s * 0.06; T.py = -0.04;
+    T.lL = 0.12 + Math.max(0, s) * 0.25; T.lR = 0.12 + Math.max(0, -s) * 0.25;
+    T.aLz = -1.3 + w * 0.25; T.aRz = 1.3 + w * 0.25; T.aLx = -0.35 + w * 0.35; T.aRx = -0.35 - w * 0.35;
+  } else if (act === 'wave') {
+    T.aRz = 2.65 + Math.sin(a.t * 9) * 0.35;
+  } else {
+    const mv = Math.min(1, speed / 3);
+    if (mv > 0.05) a.phase += dt * (4 + speed * 2.2);
+    const s = Math.sin(a.phase) * 0.65 * mv;
+    T.lL = s; T.lR = -s; T.aLx = -s * 0.8; T.aRx = s * 0.8;
+  }
+  if (performance.now() < a.kickUntil) T.lR = -1.2;
+  const k = 1 - Math.exp(-14 * dt), L = (o, key, v) => { o[key] += (v - o[key]) * k; };
+  L(a.p.position, 'y', T.py); L(a.p.position, 'x', T.px); L(a.p.rotation, 'x', T.rx); L(a.p.rotation, 'z', T.rz);
+  L(a.legL.rotation, 'x', T.lL); L(a.legR.rotation, 'x', T.lR);
+  L(a.armL.rotation, 'x', T.aLx); L(a.armR.rotation, 'x', T.aRx); L(a.armL.rotation, 'z', T.aLz); L(a.armR.rotation, 'z', T.aRz);
+  if (a.skirt) L(a.skirt.rotation, 'x', T.sk);
 }
 function makeTag() {
   const el = document.createElement('div'); el.className = 'tag';
@@ -256,6 +336,169 @@ const me = { x: W.spawn.x + (Math.random() - 0.5) * 4, z: W.spawn.z + (Math.rand
 me.av = makeAvatar(color, skinIdx, gender); me.tag = makeTag();
 let camYaw = W.spawn.camYaw, camPitch = 0.22, camDist = 7;
 
+// ---------- moves, seats, soccer ball, golf carts ----------
+me.act = ''; me.seat = null; me.ride = null; me.lift = null;
+const ACTS = ['sit', 'lie', 'hula', 'wave'];
+const seatById = new Map(W.seats.map((st) => [st.id, st]));
+const cartById = new Map(W.carts.map((c) => [c.id, c]));
+const cartTarget = new Map(); // cart id -> [x, z, ry] last reported by whoever drives it
+const r2 = (v) => Math.round(v * 100) / 100;
+let flashMsg = '', flashUntil = 0, cartVel = 0;
+function flash(msg) { flashMsg = msg; flashUntil = performance.now() + 2500; updateCtx(); }
+function seatTaken(id) { for (const r of remotes.values()) if (r.seat === id) return true; return false; }
+function cartOccupant(id, s) {
+  if (me.ride && me.ride.id === id && me.ride.s === s) return 'me';
+  for (const [pid, r] of remotes) if (r.ride && r.ride.id === id && r.ride.s === s) return pid;
+  return null;
+}
+function nearestSeat(maxD) { let best = null, bd = maxD; for (const st of W.seats) { const d = Math.hypot(st.x - me.x, st.z - me.z); if (d < bd && !seatTaken(st.id)) { bd = d; best = st; } } return best; }
+function nearestCart(maxD) { let best = null, bd = maxD; for (const c of W.carts) { const d = Math.hypot(c.x - me.x, c.z - me.z); if (d < bd) { bd = d; best = c; } } return best; }
+function standUp() { me.act = ''; me.seat = null; }
+function setAct(a) {
+  if (!entered || me.ride) return;
+  closeMoves();
+  if (me.act === a) { standUp(); sendPresence(true); return; }
+  if (myHold) setHold(null);
+  if (following) setFollow(null);
+  me.seat = null;
+  if (a === 'sit') { const st = nearestSeat(3.5); if (st) { me.seat = st.id; me.x = st.x; me.z = st.z; me.ry = st.ry; } }
+  me.act = a;
+  sendPresence(true);
+}
+function toggleRide() {
+  if (!entered) return;
+  closeMoves();
+  if (me.ride) {
+    const c = cartById.get(me.ride.id), side = me.ride.s === 0 ? 1.3 : -1.3;
+    const [x, z] = W.toWorld({ x: c.x, z: c.z, rot: c.ry }, side, 0);
+    me.x = x; me.z = z; me.ride = null; me.act = ''; cartVel = 0;
+    sendPresence(true); return;
+  }
+  const c = nearestCart(3.5);
+  if (!c) { flash('Walk up to a golf cart first'); return; }
+  const seat = !cartOccupant(c.id, 0) ? 0 : !cartOccupant(c.id, 1) ? 1 : -1;
+  if (seat < 0) { flash('This cart is full'); return; }
+  if (myHold) setHold(null);
+  if (following) setFollow(null);
+  me.seat = null; me.ride = { id: c.id, s: seat }; me.act = seat === 0 ? 'drive' : 'ride'; cartVel = 0;
+  sendPresence(true);
+}
+function driveCart(dt, ix, iz) {
+  const c = cartById.get(me.ride.id);
+  cartVel += iz * 4.5 * dt;
+  cartVel *= Math.exp(-(iz ? 0.25 : 1.2) * dt);
+  cartVel = Math.max(-3, Math.min(7.5, cartVel));
+  const ry = c.ry - ix * 1.5 * dt * Math.max(-1, Math.min(1, cartVel / 2.5));
+  const o = { x: c.x + Math.sin(ry) * cartVel * dt, z: c.z + Math.cos(ry) * cartVel * dt }, wx = o.x, wz = o.z;
+  collide(o);
+  const nose = { x: o.x + Math.sin(ry) * 1.1 * Math.sign(cartVel || 1), z: o.z + Math.cos(ry) * 1.1 * Math.sign(cartVel || 1) }, nx = nose.x, nz = nose.z;
+  collide(nose);
+  if (Math.hypot(nose.x - nx, nose.z - nz) > 0.01 || Math.hypot(o.x - wx, o.z - wz) > 0.01) { cartVel *= -0.25; W.placeCart(c, c.x, c.z, ry); return; }
+  W.placeCart(c, o.x, o.z, ry);
+}
+
+// soccer ball: whoever touched it last shares its state; everyone simulates it locally
+const field = W.field;
+const ballTex = (() => {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128; const g = cv.getContext('2d');
+  g.fillStyle = '#f7f7f4'; g.fillRect(0, 0, 256, 128);
+  g.fillStyle = '#1e1e22';
+  for (const [x, y, r] of [[32, 64, 14], [96, 64, 14], [160, 64, 14], [224, 64, 14], [0, 18, 12], [64, 18, 12], [128, 18, 12], [192, 18, 12], [256, 18, 12], [0, 110, 12], [64, 110, 12], [128, 110, 12], [192, 110, 12], [256, 110, 12]]) {
+    g.beginPath(); for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2 - Math.PI / 2; g.lineTo(x + Math.cos(a) * r, y + Math.sin(a) * r); } g.closePath(); g.fill();
+  }
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; return t;
+})();
+const ballMesh = new THREE.Mesh(new THREE.SphereGeometry(0.11, 24, 16), new THREE.MeshStandardMaterial({ map: ballTex, roughness: 0.45 }));
+ballMesh.castShadow = true; scene.add(ballMesh);
+const ball = { x: field.x, z: field.z, y: field.y + 0.11, vx: 0, vz: 0, vy: 0, stamp: 0, goalUntil: 0 };
+const rollAxis = new THREE.Vector3();
+let lastBallPub = 0;
+function ballToCenter() { ball.x = field.x; ball.z = field.z; ball.y = field.y + 0.8; ball.vx = ball.vz = ball.vy = 0; }
+function publishBall() {
+  ball.stamp = Math.max(Date.now(), ball.stamp + 1);
+  lastBallPub = performance.now();
+  if (room && entered) room.presence({ b: [r2(ball.x), r2(ball.z), r2(ball.y), r2(ball.vx), r2(ball.vz), r2(ball.vy), ball.stamp] }).catch(() => {});
+}
+function goal() {
+  ball.goalUntil = performance.now() + 3200;
+  const el = $('goal'); el.hidden = false;
+  setTimeout(() => { el.hidden = true; }, 2600);
+  spawnHearts(tmp.set(ball.x, ball.y - 1.6, ball.z).clone(), 8);
+  setTimeout(ballToCenter, 2800);
+}
+function stepBall(dt) {
+  const c = Math.cos(field.rot), sn = Math.sin(field.rot);
+  ball.vy -= 9.8 * dt; ball.y += ball.vy * dt;
+  const gy = groundH(ball.x, ball.z) + 0.11;
+  if (ball.y < gy) { ball.y = gy; ball.vy = ball.vy < -1.2 ? -ball.vy * 0.45 : 0; }
+  const onGround = ball.y < gy + 0.02;
+  const fr = Math.exp(-(onGround ? 0.75 : 0.05) * dt); ball.vx *= fr; ball.vz *= fr;
+  if (onGround && Math.hypot(ball.vx, ball.vz) < 0.04) ball.vx = ball.vz = 0;
+  const px = ball.x, pz = ball.z;
+  ball.x += ball.vx * dt; ball.z += ball.vz * dt;
+  let [lx, lz] = W.toLocal(field, ball.x, ball.z);
+  let vlx = ball.vx * c - ball.vz * sn, vlz = ball.vx * sn + ball.vz * c;
+  const inMouth = Math.abs(lz) < 3.5 && ball.y < gy + 2.3;
+  if (inMouth && Math.abs(lx) > field.halfL && Math.abs(lx) < field.halfL + 1 && performance.now() > ball.goalUntil) goal();
+  if (inMouth && Math.abs(lx) > field.halfL + 1.6) { lx = Math.sign(lx) * (field.halfL + 1.6); vlx = -vlx * 0.2; vlz *= 0.5; }
+  else {
+    const ex = Math.max(Math.abs(lx) - field.TL, 0), d = Math.hypot(ex, lz), lim = field.rIn - 0.4;
+    if (d > lim) {
+      const nx = Math.sign(lx) * ex / d, nz = lz / d, dot = vlx * nx + vlz * nz;
+      if (dot > 0) { vlx -= 1.6 * dot * nx; vlz -= 1.6 * dot * nz; }
+      lx -= nx * (d - lim); lz -= nz * (d - lim);
+    }
+  }
+  ball.x = field.x + lx * c + lz * sn; ball.z = field.z - lx * sn + lz * c;
+  ball.vx = vlx * c + vlz * sn; ball.vz = -vlx * sn + vlz * c;
+  const dx = ball.x - px, dz = ball.z - pz, dist = Math.hypot(dx, dz);
+  if (dist > 1e-5) { rollAxis.set(dz, 0, -dx).normalize(); ballMesh.rotateOnWorldAxis(rollAxis, dist / 0.11); }
+  ballMesh.position.set(ball.x, ball.y, ball.z);
+}
+// walking into the ball dribbles it
+function dribble(vx, vz) {
+  const d = Math.hypot(ball.x - me.x, ball.z - me.z), sp = Math.hypot(vx, vz);
+  if (d > 0.5 || sp < 0.3 || ball.y > groundH(ball.x, ball.z) + 0.4) return;
+  const ux = vx / sp, uz = vz / sp;
+  ball.vx = ux * (sp * 1.35 + 0.8); ball.vz = uz * (sp * 1.35 + 0.8);
+  ball.x = me.x + ux * 0.52; ball.z = me.z + uz * 0.52;
+  if (performance.now() - lastBallPub > 120) publishBall();
+}
+function kick() {
+  if (!entered || me.ride) return;
+  closeMoves();
+  if (Math.hypot(ball.x - me.x, ball.z - me.z) > 1.8) { flash('Get closer to the ball to kick it'); return; }
+  if (me.act) standUp();
+  const ux = Math.sin(me.ry), uz = Math.cos(me.ry);
+  ball.vx = ux * 13; ball.vz = uz * 13; ball.vy = 3.2; ball.y += 0.05;
+  me.av.kickUntil = performance.now() + 280;
+  publishBall();
+}
+
+// small hint above the bar for whatever is in reach
+function updateCtx() {
+  let msg = '';
+  if (performance.now() < flashUntil) msg = flashMsg;
+  else if (entered) {
+    if (me.ride) msg = me.ride.s === 0 ? 'W/S drive · A/D steer · R get out' : 'Along for the ride · R get out';
+    else if (me.act) msg = me.act === 'sit' && me.seat ? 'Sitting · move to stand up' : 'Move to stop';
+    else if (nearestCart(3.5)) msg = 'R · ride the golf cart';
+    else if (Math.hypot(ball.x - me.x, ball.z - me.z) < 1.8) msg = 'F · kick the ball';
+    else if (nearestSeat(3)) msg = 'X · sit down';
+  }
+  const el = $('ctx');
+  if (el.textContent !== msg) el.textContent = msg;
+  el.hidden = !msg;
+}
+const movesMenu = $('moves'), movesBtn = $('movesBtn');
+function closeMoves() { movesMenu.hidden = true; movesBtn.setAttribute('aria-expanded', 'false'); }
+movesBtn.onclick = () => { const open = movesMenu.hidden; movesMenu.hidden = !open; movesBtn.setAttribute('aria-expanded', String(open)); };
+movesMenu.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-m]'); if (!b) return;
+  const m = b.dataset.m;
+  if (m === 'kick') kick(); else if (m === 'ride') toggleRide(); else setAct(m);
+});
+
 // ---------- remote players ----------
 const remotes = new Map();
 function safeColor(c) { return typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : '#cccccc'; }
@@ -271,11 +514,18 @@ function upsertRemote(peer) {
   }
   r.tx = Math.max(W.bounds.minX, Math.min(W.bounds.maxX, pr.x)); r.tz = Math.max(W.bounds.minZ, Math.min(W.bounds.maxZ, pr.z)); r.tr = typeof pr.ry === 'number' ? pr.ry : r.tr;
   r.nick = safeText(pr.nick, 16) || 'Guest';
-  const c = safeColor(pr.color); if (c !== r.color) { r.color = c; r.av.shirt.color.copy(C(c)); }
+  const c = safeColor(pr.color); if (c !== r.color) { r.color = c; r.av.lei.color.copy(C(c)); }
   const gg = pr.g === 'f' ? 'f' : 'm';
   if (gg !== r.av.gender) { const old = r.av; r.av = makeAvatar(r.color, r.skin, gg); r.av.g.position.copy(old.g.position); scene.remove(old.g); }
   r.tag.nm.textContent = r.nick;
   r.hold = typeof pr.hold === 'string' ? pr.hold : null;
+  r.act = ACTS.includes(pr.act) ? pr.act : '';
+  r.seat = typeof pr.seat === 'string' && seatById.has(pr.seat) ? pr.seat : null;
+  r.ride = pr.ride && cartById.has(pr.ride.id) && (pr.ride.s === 0 || pr.ride.s === 1) ? { id: pr.ride.id, s: pr.ride.s } : null;
+  if (r.ride && r.ride.s === 0 && Array.isArray(pr.cp) && pr.cp.length === 3 && pr.cp.every(Number.isFinite)) cartTarget.set(r.ride.id, pr.cp);
+  if (Array.isArray(pr.b) && pr.b.length === 7 && pr.b.every(Number.isFinite) && pr.b[6] > ball.stamp && Math.hypot(pr.b[0] - field.x, pr.b[1] - field.z) < 150) {
+    [ball.x, ball.z, ball.y, ball.vx, ball.vz, ball.vy, ball.stamp] = pr.b;
+  }
   if (pr.say && typeof pr.say.t === 'number' && pr.say.t !== r.lastSay) {
     r.lastSay = pr.say.t; r.tag.say.textContent = safeText(pr.say.txt, 80); r.tag.sayUntil = performance.now() + 7000;
   }
@@ -442,7 +692,9 @@ function sendPresence(force) {
   if (!room || !entered) return;
   const now = performance.now();
   if (!force && now - lastSent < 90) return;
-  const st = { nick, color, x: +me.x.toFixed(2), z: +me.z.toFixed(2), ry: +me.ry.toFixed(2), hold: myHold, g: gender };
+  const driving = me.ride && me.ride.s === 0 ? cartById.get(me.ride.id) : null;
+  const st = { nick, color, x: +me.x.toFixed(2), z: +me.z.toFixed(2), ry: +me.ry.toFixed(2), hold: myHold, g: gender,
+    act: ACTS.includes(me.act) ? me.act : null, seat: me.seat, ride: me.ride, cp: driving ? [r2(driving.x), r2(driving.z), r2(driving.ry)] : null };
   const key = JSON.stringify(st);
   if (!force && key === lastKey) return;
   lastKey = key; lastSent = now;
@@ -461,8 +713,8 @@ async function prefillName() {
 const sw = $('swatches');
 COLORS.forEach((c) => {
   const b = document.createElement('button'); b.type = 'button'; b.className = 'sw'; b.style.background = c;
-  b.setAttribute('role', 'radio'); b.setAttribute('aria-label', 'Shirt color ' + c); b.setAttribute('aria-checked', String(c === color));
-  b.onclick = () => { color = c; me.av.shirt.color.copy(C(c)); [...sw.children].forEach((x) => x.setAttribute('aria-checked', String(x === b))); };
+  b.setAttribute('role', 'radio'); b.setAttribute('aria-label', 'Lei color ' + c); b.setAttribute('aria-checked', String(c === color));
+  b.onclick = () => { color = c; me.av.lei.color.copy(C(c)); [...sw.children].forEach((x) => x.setAttribute('aria-checked', String(x === b))); };
   sw.append(b);
 });
 [...$('gender').children].forEach((b) => {
@@ -542,6 +794,13 @@ addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && entered) { e.preventDefault(); $('say').focus(); return; }
   if (e.code === 'KeyH' && entered) { sendHeart(); return; }
   if (e.code === 'KeyG' && entered) { toggleHold(); return; }
+  if (e.code === 'Escape') { closeMoves(); return; }
+  if (entered && !e.repeat) {
+    const map = { KeyX: 'sit', KeyZ: 'lie', KeyC: 'hula', KeyV: 'wave' };
+    if (map[e.code]) { setAct(map[e.code]); return; }
+    if (e.code === 'KeyF' || e.code === 'Space') { e.preventDefault(); kick(); return; }
+    if (e.code === 'KeyR') { toggleRide(); return; }
+  }
   keys.add(e.code);
   if (e.code.startsWith('Arrow')) e.preventDefault();
 });
@@ -618,49 +877,80 @@ function frame() {
   }
   if (joy.id !== null) { ix += joy.x; iz -= joy.y; }
   const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.95;
-  let vx = 0, vz = 0;
-  const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
-  if (ix || iz) {
-    if (following) setFollow(null);
-    const L = Math.max(1, Math.hypot(ix, iz)), sp = run ? 6.5 : 3.2;
-    vx = (fx * iz + rx * ix) / L * sp; vz = (fz * iz + rz * ix) / L * sp;
-  } else if (following && remotes.has(following)) {
-    const p = remotes.get(following);
-    const tx = p.x + Math.cos(p.ry) * 0.95, tz = p.z - Math.sin(p.ry) * 0.95;
-    const dx = tx - me.x, dz = tz - me.z, d = Math.hypot(dx, dz);
-    if (d > 0.15) { const sp = Math.min(d * 3, 8); vx = dx / d * sp; vz = dz / d * sp; }
-    else me.ry = lerpAngle(me.ry, p.ry, 1 - Math.exp(-6 * dt));
+  // carts someone else is driving glide toward the pose they report
+  for (const c of W.carts) {
+    if (me.ride && me.ride.id === c.id && me.ride.s === 0) continue;
+    const tg = cartTarget.get(c.id); if (!tg) continue;
+    const kk = 1 - Math.exp(-8 * dt);
+    W.placeCart(c, c.x + (tg[0] - c.x) * kk, c.z + (tg[1] - c.z) * kk, lerpAngle(c.ry, tg[2], kk));
   }
-  const ox = me.x, oz = me.z;
-  me.x += vx * dt; me.z += vz * dt; collide(me);
-  // holding hands: whoever walks leads, the idle one is pulled along at arm's length
-  const partner = holdingWith();
-  if (partner && !(ix || iz)) {
-    const dx = me.x - partner.x, dz = me.z - partner.z, d = Math.hypot(dx, dz) || 1;
-    if (d > 0.95) { me.x = partner.x + dx / d * 0.95; me.z = partner.z + dz / d * 0.95; collide(me); }
-    else if (d < 0.6) { me.x = partner.x + dx / d * 0.6; me.z = partner.z + dz / d * 0.6; }
+  let vx = 0, vz = 0, partner = null;
+  if (me.ride) {
+    const c = cartById.get(me.ride.id);
+    if (me.ride.s === 0) { driveCart(dt, ix, iz); camYaw = lerpAngle(camYaw, c.ry + Math.PI, 1 - Math.exp(-2.5 * dt)); }
+    // two people claiming the same seat: the earlier peer label keeps it
+    let other = null;
+    for (const [pid, r] of remotes) if (r.ride && r.ride.id === me.ride.id && r.ride.s === me.ride.s) other = pid;
+    if (other && myPeer && other < myPeer) { toggleRide(); flash('Someone else took that seat'); }
+    else {
+      const seat = W.cartSeat(c, me.ride.s);
+      me.x = seat.x; me.z = seat.z; me.ry = c.ry; me.speed = 0; me.lift = seat.y - groundH(me.x, me.z);
+    }
+  } else {
+    if ((ix || iz) && me.act) { standUp(); sendPresence(true); }
+    const fx = -Math.sin(camYaw), fz = -Math.cos(camYaw), rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+    if (ix || iz) {
+      if (following) setFollow(null);
+      const L = Math.max(1, Math.hypot(ix, iz)), sp = run ? 6.5 : 3.2;
+      vx = (fx * iz + rx * ix) / L * sp; vz = (fz * iz + rz * ix) / L * sp;
+    } else if (following && remotes.has(following) && !me.act) {
+      const p = remotes.get(following);
+      const tx = p.x + Math.cos(p.ry) * 0.95, tz = p.z - Math.sin(p.ry) * 0.95;
+      const dx = tx - me.x, dz = tz - me.z, d = Math.hypot(dx, dz);
+      if (d > 0.15) { const sp = Math.min(d * 3, 8); vx = dx / d * sp; vz = dz / d * sp; }
+      else me.ry = lerpAngle(me.ry, p.ry, 1 - Math.exp(-6 * dt));
+    }
+    const ox = me.x, oz = me.z;
+    if (vx || vz) { me.x += vx * dt; me.z += vz * dt; collide(me); }
+    // holding hands: whoever walks leads, the idle one is pulled along at arm's length
+    partner = me.act ? null : holdingWith();
+    if (partner && !(ix || iz) && !partner.ride && !partner.act) {
+      const dx = me.x - partner.x, dz = me.z - partner.z, d = Math.hypot(dx, dz) || 1;
+      if (d > 0.95) { me.x = partner.x + dx / d * 0.95; me.z = partner.z + dz / d * 0.95; collide(me); }
+      else if (d < 0.6) { me.x = partner.x + dx / d * 0.6; me.z = partner.z + dz / d * 0.6; }
+    }
+    const moved = Math.hypot(me.x - ox, me.z - oz);
+    me.speed = moved / Math.max(dt, 1e-4);
+    if (moved > 0.002) me.ry = lerpAngle(me.ry, Math.atan2(me.x - ox, me.z - oz), 1 - Math.exp(-10 * dt));
+    if (!me.act) dribble(me.speed > 0.3 ? (me.x - ox) / dt : 0, me.speed > 0.3 ? (me.z - oz) / dt : 0);
+    me.lift = me.seat && seatById.has(me.seat) ? seatById.get(me.seat).y - groundH(me.x, me.z) : null;
   }
   if (!!partner !== wasHolding) {
     wasHolding = !!partner;
     if (partner) spawnHearts(tmp.set((partner.x + me.x) / 2, me.av.g.position.y, (partner.z + me.z) / 2).clone(), 6);
   }
-  const moved = Math.hypot(me.x - ox, me.z - oz);
-  me.speed = moved / Math.max(dt, 1e-4);
-  if (moved > 0.002) me.ry = lerpAngle(me.ry, Math.atan2(me.x - ox, me.z - oz), 1 - Math.exp(-10 * dt));
   me.av.g.position.set(me.x, groundH(me.x, me.z), me.z); me.av.g.rotation.y = me.ry;
-  animateAvatar(me.av, me.speed, dt);
+  animateAvatar(me.av, me.speed, dt, me.act, me.lift);
   if (partner) reachArm(me.av, me.ry, me.x, me.z, partner.x, partner.z);
+  stepBall(dt);
   sendPresence(false);
-  if (now > holdUiT) { holdUiT = now + 150; updateHoldUi(); }
+  if (now > holdUiT) { holdUiT = now + 150; updateHoldUi(); updateCtx(); }
 
   const k = 1 - Math.exp(-9 * dt);
   for (const r of remotes.values()) {
-    const px = r.x, pz = r.z;
-    r.x += (r.tx - r.x) * k; r.z += (r.tz - r.z) * k; r.ry = lerpAngle(r.ry, r.tr, k);
-    const mv = Math.hypot(r.x - px, r.z - pz); r.speed = r.speed * 0.8 + (mv / Math.max(dt, 1e-4)) * 0.2;
+    let lift = null;
+    if (r.ride) {
+      const c = cartById.get(r.ride.id), seat = W.cartSeat(c, r.ride.s);
+      r.x = seat.x; r.z = seat.z; r.ry = c.ry; r.speed = 0; lift = seat.y - groundH(r.x, r.z);
+    } else {
+      const px = r.x, pz = r.z;
+      r.x += (r.tx - r.x) * k; r.z += (r.tz - r.z) * k; r.ry = lerpAngle(r.ry, r.tr, k);
+      const mv = Math.hypot(r.x - px, r.z - pz); r.speed = r.speed * 0.8 + (mv / Math.max(dt, 1e-4)) * 0.2;
+      if (r.act === 'sit' && r.seat) lift = seatById.get(r.seat).y - groundH(r.x, r.z);
+    }
     r.av.g.position.set(r.x, groundH(r.x, r.z), r.z); r.av.g.rotation.y = r.ry;
-    animateAvatar(r.av, r.speed, dt);
-    if (r === partner) reachArm(r.av, r.ry, r.x, r.z, me.x, me.z);
+    animateAvatar(r.av, r.speed, dt, r.ride ? (r.ride.s === 0 ? 'drive' : 'ride') : r.act, lift);
+    if (partner && r === partner) reachArm(r.av, r.ry, r.x, r.z, me.x, me.z);
     if (Math.hypot(r.x - me.x, r.z - me.z) < 1.7 && now > nearHeartT) {
       nearHeartT = now + 2600;
       spawnHearts(tmp.set((r.x + me.x) / 2, Math.max(r.av.g.position.y, me.av.g.position.y) + 0.2, (r.z + me.z) / 2).clone(), 1);

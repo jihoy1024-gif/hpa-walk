@@ -826,6 +826,22 @@ function createWorld(canvas) {
     scene.add(Object.assign(new THREE.Mesh(deck, overlayMat(null, { color: C('#8c6b52') })), { receiveShadow: true }));
   })();
 
+
+  // ---------- benches, bleacher seats, golf carts ----------
+  // every seat: world position, seat height and the heading of someone sitting on it
+  const seats = [];
+  const benchWood = new THREE.MeshStandardMaterial({ color: C('#7a5a3e'), roughness: 0.8 });
+  const benchLeg = new THREE.MeshStandardMaterial({ color: C('#3a2c22'), roughness: 0.8 });
+  function bench(x, z, rot) {
+    const y = groundH(x, z), o = { x, z, rot };
+    const bg = new THREE.Group(); bg.position.set(x, y, z); bg.rotation.y = rot; scene.add(bg);
+    for (let i = 0; i < 3; i++) { const sl = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.05, 0.13), benchWood); sl.position.set(0, 0.45, -0.16 + i * 0.16); sl.castShadow = true; sl.receiveShadow = true; bg.add(sl); }
+    for (let i = 0; i < 2; i++) { const sl = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.12, 0.04), benchWood); sl.position.set(0, 0.68 + i * 0.17, -0.25); sl.rotation.x = -0.12; sl.castShadow = true; bg.add(sl); }
+    [-0.78, 0.78].forEach((bx) => { const l = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.9, 0.48), benchLeg); l.position.set(bx, 0.43, -0.03); l.castShadow = true; bg.add(l); });
+    box(x, z, 0.95, 0.3, rot);
+    [-0.45, 0.45].forEach((sx) => { const [px, pz] = toWorld(o, sx, 0.02); seats.push({ id: 's' + seats.length, x: px, z: pz, y: y + 0.47, ry: rot }); });
+  }
+
   // ---------- flags and benches by Modern Languages ----------
   const flags = [];
   (function flagsAndBenches() {
@@ -865,16 +881,60 @@ function createWorld(canvas) {
     const [fx, fz] = toWorld(ml, -9.5, ml.d / 2 + 15);
     const pave = drape(new THREE.CircleGeometry(4.2, 28).rotateX(-Math.PI / 2), fx, fz, ml.rot, 0.07);
     scene.add(Object.assign(new THREE.Mesh(pave, overlayMat(roadTex.path)), { receiveShadow: true }));
-    // benches
-    const wood = new THREE.MeshStandardMaterial({ color: C('#8a6a4a'), roughness: 0.8 });
-    [[2, ml.d / 2 + 6], [10, ml.d / 2 + 6], [-22, ml.d / 2 + 10]].forEach(([lx, lz]) => {
-      const [x, z] = toWorld(ml, lx, lz), y = groundH(x, z);
-      const bg = new THREE.Group(); bg.position.set(x, y, z); bg.rotation.y = ml.rot; scene.add(bg);
-      const seat = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.07, 0.45), wood); seat.position.y = 0.45; seat.castShadow = true; bg.add(seat);
-      const back = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.4, 0.06), wood); back.position.set(0, 0.75, -0.22); back.castShadow = true; bg.add(back);
-      [-0.8, 0.8].forEach((bx) => { const l = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.45, 0.45), postMat); l.position.set(bx, 0.22, 0); bg.add(l); });
-      box(x, z, 1, 0.35, ml.rot);
-    });
+    [[2, ml.d / 2 + 6], [10, ml.d / 2 + 6], [-22, ml.d / 2 + 10]].forEach(([lx, lz]) => { const [x, z] = toWorld(ml, lx, lz); bench(x, z, ml.rot); });
+  })();
+
+
+  // more benches around the fields and lawns
+  (function moreBenches() {
+    [[-34, -(R_OUT + 2.6)], [34, -(R_OUT + 2.6)]].forEach(([lx, lz]) => { const [x, z] = toWorld(TRACK, lx, lz); bench(x, z, TRACK.rot); });
+    [[-22, uf.hd + 3.5], [22, uf.hd + 3.5]].forEach(([lx, lz]) => { const [x, z] = toWorld(uf, lx, lz); bench(x, z, uf.rot + Math.PI); });
+    [[1100, 612, 0], [1180, 605, 0], [600, 402, -0.4], [565, 160, 0.6], [985, 640, -0.3]].forEach(([px, py, r]) => { const [x, z] = P(px, py); bench(x, z, r); });
+    // bleacher rows 2, 4 and 6, facing the track
+    const depth = 0.82, rise = 0.42, z0 = -(R_OUT + 2.4), y0 = groundH(0, 0);
+    for (const row of [1, 3, 5]) for (let lx = -22; lx <= 22; lx += 4.4) {
+      const [x, z] = toWorld(TRACK, lx, z0 - row * depth);
+      seats.push({ id: 'b' + row + '_' + Math.round(lx), x, z, y: y0 + rise * (row + 1) + 0.06, ry: TRACK.rot });
+    }
+  })();
+
+  const carts = [];
+  function placeCart(c, x, z, ry) {
+    c.x = x; c.z = z; c.ry = ry;
+    const y = groundH(x, z), f = 0.9, fx = Math.sin(ry) * f, fz = Math.cos(ry) * f;
+    c.mesh.position.set(x, y, z); c.mesh.rotation.set(0, ry, 0);
+    c.mesh.rotateX(-Math.atan2(groundH(x + fx, z + fz) - groundH(x - fx, z - fz), 2 * f));
+  }
+  // seat 0 = driver (left side), seat 1 = passenger; world x, z and seat height
+  function cartSeat(c, seat) { const [x, z] = toWorld({ x: c.x, z: c.z, rot: c.ry }, seat === 0 ? 0.27 : -0.27, -0.1); return { x, z, y: groundH(c.x, c.z) + 0.78 }; }
+  (function golfCarts() {
+    const m = (c, r, mt) => new THREE.MeshStandardMaterial({ color: C(c), roughness: r, metalness: mt || 0 });
+    const white = m('#f2f1ec', 0.35, 0.15), seatM = m('#d8c4a0', 0.8), dark = m('#1d1e21', 0.6), roofM = m('#2b2c30', 0.5), chrome = m('#c9ccd0', 0.3, 0.8);
+    const add = (g, geo, mat, x, y, z) => { const mesh = new THREE.Mesh(geo, mat); mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh); return mesh; };
+    function cartMesh() {
+      const g = new THREE.Group();
+      add(g, new THREE.BoxGeometry(1.2, 0.32, 2.3), white, 0, 0.42, 0);
+      add(g, new THREE.BoxGeometry(1.16, 0.42, 0.55), white, 0, 0.78, 0.92);
+      add(g, new THREE.BoxGeometry(1.05, 0.14, 0.52), seatM, 0, 0.7, -0.12);
+      add(g, new THREE.BoxGeometry(1.05, 0.45, 0.1), seatM, 0, 0.98, -0.4);
+      add(g, new THREE.BoxGeometry(1.12, 0.22, 0.62), white, 0, 0.66, -0.86);
+      for (const [x, z] of [[0.55, 0.78], [-0.55, 0.78], [0.55, -0.78], [-0.55, -0.78]]) { const w = add(g, new THREE.CylinderGeometry(0.22, 0.22, 0.18, 16), dark, x, 0.22, z); w.rotation.z = Math.PI / 2; }
+      for (const [x, z] of [[0.52, 0.62], [-0.52, 0.62], [0.52, -0.62], [-0.52, -0.62]]) add(g, new THREE.BoxGeometry(0.05, 1.3, 0.05), chrome, x, 1.25, z);
+      add(g, new THREE.BoxGeometry(1.3, 0.07, 1.95), roofM, 0, 1.92, 0);
+      const wheel = add(g, new THREE.TorusGeometry(0.15, 0.025, 6, 18), dark, 0.27, 1.08, 0.42); wheel.rotation.x = -1.0;
+      const col = add(g, new THREE.CylinderGeometry(0.025, 0.025, 0.4, 6), dark, 0.27, 0.92, 0.52); col.rotation.x = 0.55;
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 0.75), new THREE.MeshStandardMaterial({ color: C('#cfe3ee'), transparent: true, opacity: 0.25, roughness: 0.1, side: THREE.DoubleSide, depthWrite: false }));
+      glass.position.set(0, 1.5, 0.62); glass.rotation.x = -0.1; g.add(glass);
+      scene.add(g);
+      return g;
+    }
+    const ml = BUILDINGS.find((b) => b.name === 'ml');
+    const spots = [
+      [...P(1235, 602), 0.3], [...P(1092, 700), 1.2],
+      [...toWorld(TRACK, 12, -(R_OUT + 13)), TRACK.rot + Math.PI / 2],
+      [...toWorld(ml, 14, ml.d / 2 + 22), ml.rot + 2.4],
+    ];
+    spots.forEach(([x, z, ry], i) => { const c = { id: 'cart' + i, mesh: cartMesh(), home: { x, z, ry } }; placeCart(c, x, z, ry); carts.push(c); });
   })();
 
   // ---------- trees ----------
@@ -1315,7 +1375,9 @@ function createWorld(canvas) {
   const spawn = { x: sx, z: sz, ry: Math.atan2(fwd[0], fwd[1]), camYaw: Math.atan2(-fwd[0], -fwd[1]) };
   const bounds = { minX: -260, maxX: 640, minZ: -340, maxZ: 260 };
 
-  return { scene, renderer, camera, groundH, colliders, flags, C, spawn, bounds, update, setTime, setQuality, times: TIMES, get timeKey() { return timeKey; } };
+  const field = { x: TRACK.x, z: TRACK.z, rot: TRACK.rot, halfL: FIELD_L / 2, halfW: FIELD_W / 2, rIn: R_IN, TL, y: groundH(0, 0) };
+  return { scene, renderer, camera, groundH, colliders, flags, C, spawn, bounds, update, setTime, setQuality, times: TIMES, get timeKey() { return timeKey; },
+    seats, carts, placeCart, cartSeat, field, toLocal, toWorld };
 }
 
 window.HPA = { createWorld };
