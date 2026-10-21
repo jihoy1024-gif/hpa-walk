@@ -75,6 +75,23 @@ body { font-family: var(--body); overflow: hidden; }
 #ctx { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(146px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 32px); padding: 6px 12px; font-size: 13px; pointer-events: none; white-space: nowrap; }
 #raceBig { position: absolute; left: 0; right: 0; top: 24%; text-align: center; font-family: var(--display); font-weight: 700; font-size: clamp(56px, 12vw, 120px); color: var(--foam); text-shadow: 0 4px 30px rgba(236, 79, 134, 0.7); pointer-events: none; }
 #raceHud { position: absolute; left: 50%; transform: translateX(-50%); top: calc(14px + env(safe-area-inset-top, 0px)); padding: 8px 14px; font-size: 15px; font-variant-numeric: tabular-nums; pointer-events: none; text-align: center; line-height: 1.5; }
+#filmBtn { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(196px + env(safe-area-inset-bottom, 0px)); z-index: 4; padding: 10px 18px; font-size: 15px; }
+#film { position: absolute; inset: 0; pointer-events: none; z-index: 8; }
+#film .lb { position: absolute; left: 0; right: 0; height: 9vh; background: #000; }
+#film .lb.t { top: 0; } #film .lb.b { bottom: 0; }
+#filmFade, #filmBack { position: absolute; inset: 0; background: #000; pointer-events: none; }
+#filmBack { z-index: 9; }
+#filmBubbles { position: absolute; inset: 0; overflow: hidden; }
+.fb { position: absolute; transform: translate(-50%, -100%) translateY(8px); opacity: 0; transition: opacity 0.35s ease, transform 0.35s ease; text-align: center; font-size: clamp(15px, 2.1vw, 20px); line-height: 1.35; padding: 8px 15px; border-radius: 16px; background: var(--foam); color: #2a2238; box-shadow: 0 6px 22px rgba(0,0,0,0.4); white-space: nowrap; }
+.fb::after { content: ''; position: absolute; left: 50%; bottom: -7px; margin-left: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: var(--foam); }
+.fb.on { opacity: 1; transform: translate(-50%, -100%); }
+.fb.soft { font-style: italic; font-size: clamp(14px, 1.9vw, 18px); }
+.fb.dots i { display: inline-block; width: 7px; height: 7px; margin: 0 3px; border-radius: 50%; background: #7a6c8a; animation: fbDot 1s infinite ease-in-out; }
+.fb.dots i:nth-child(2) { animation-delay: 0.15s; } .fb.dots i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes fbDot { 50% { transform: translateY(-4px); opacity: 0.45; } }
+#filmClock { position: absolute; left: max(24px, env(safe-area-inset-left, 0px)); top: calc(9vh + 18px); font-family: var(--display); font-size: clamp(18px, 2.6vw, 26px); color: var(--foam); letter-spacing: 0.06em; text-shadow: 0 2px 12px rgba(0,0,0,0.7); font-variant-numeric: tabular-nums; opacity: 0; }
+#filmSkip { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(9vh + 14px); pointer-events: auto; font-size: 13px; padding: 6px 12px; }
+#app.filming > :not(#c):not(#film):not(#filmBack) { visibility: hidden !important; }
 #goal { position: absolute; left: 0; right: 0; top: 28%; text-align: center; font-family: var(--display); font-weight: 700; font-size: clamp(48px, 10vw, 96px); color: var(--foam); text-shadow: 0 4px 30px rgba(236, 79, 134, 0.7); pointer-events: none; }
 .menu { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(76px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(3, auto); gap: 6px; padding: 8px; max-width: calc(100% - 32px); }
 .menu .btn { justify-content: space-between; gap: 10px; }
@@ -142,6 +159,15 @@ body { font-family: var(--body); overflow: hidden; }
   <div id="goal" hidden>Goal!</div>
   <div id="raceBig" hidden></div>
   <div id="raceHud" class="panel" role="status" hidden></div>
+  <button id="filmBtn" class="btn pulse" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.4.7-1.2 2.2-2.4 4.3-2.4 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21z"/></svg>Watch animation</button>
+  <div id="film" hidden>
+    <div id="filmBubbles"></div>
+    <div id="filmClock"></div>
+    <div class="lb t"></div><div class="lb b"></div>
+    <div id="filmFade"></div>
+    <button id="filmSkip" class="btn panel" type="button">Skip <kbd>Esc</kbd></button>
+  </div>
+  <div id="filmBack" hidden></div>
   <div id="moves" class="panel menu" hidden>
     <button class="btn" type="button" data-m="sit">Sit <kbd>X</kbd></button>
     <button class="btn" type="button" data-m="lie">Lie down <kbd>Z</kbd></button>
@@ -215,7 +241,7 @@ body { font-family: var(--body); overflow: hidden; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="world.js?v=18"></script>
+<script src="world.js?v=19"></script>
 <script>
 (() => {
 'use strict';
@@ -263,7 +289,8 @@ const floralTex = (() => {
 // ---------- Jiho and Isa: photo-based models made in Tripo, given a simple skeleton here ----------
 // The meshes come unrigged, standing in an A-pose. The joints below were measured by slicing each model by height
 // (where the legs part, where the arms leave the body, how low the hands hang), as fractions of its height [x, y];
-// every vertex is then tied to the hips, a leg or an arm, so the same poses as the hand-built avatars move them.
+// every vertex is then tied to the hips, a leg, an arm, the upper body or the head, so the same poses as the
+// hand-built avatars move them, and the animation at the nook can bow, turn and tilt them.
 const MODELS = {
   m: { url: 'models/jiho.glb', v: 1, H: 1.75, joints: { hip: [0.075, 0.3], sh: [0.12, 0.56], hand: [0.2, 0.34] } },
   f: { url: 'models/isa.glb', v: 2, H: 1.62, joints: { hip: [0.06, 0.27], sh: [0.13, 0.54], hand: [0.205, 0.36] } },
@@ -280,45 +307,53 @@ function prepareModel(kind, gltf) {
   if (!geo.attributes.normal) geo.computeVertexNormals();
   const pos = geo.attributes.position, n = pos.count, J = M.joints, at = ([x, y]) => ({ x: x * H, y: y * H });
   const hip = at(J.hip), hand = at(J.hand);
-  const sh = at(J.sh), ex = hand.x - sh.x, ey = hand.y - sh.y, L2 = ex * ex + ey * ey;
-  // bones: 0 hips, 1 left leg, 2 right leg, 3 left arm, 4 right arm (left is -x, as on the other avatars)
-  const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+  const sh = at(J.sh), ex = hand.x - sh.x, ey = hand.y - sh.y, L2 = ex * ex + ey * ey, neck = sh.y + 0.075 * H;
+  const sm = (a, b, v) => { const k = Math.max(0, Math.min(1, (v - a) / (b - a))); return k * k * (3 - 2 * k); };
+  // bones: 0 hips, 1 left leg, 2 right leg, 3 left arm, 4 right arm, 5 upper body, 6 head (left is -x, as on the other avatars)
+  const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4), hb = { y0: Infinity, y1: -Infinity, z1: -Infinity, x1: 0 };
+  const set = (i, a, wa, b, wb, c, wc) => { si[i * 4] = a; sw[i * 4] = wa; si[i * 4 + 1] = b; sw[i * 4 + 1] = wb; si[i * 4 + 2] = c || 0; sw[i * 4 + 2] = wc || 0; };
   for (let i = 0; i < n; i++) {
     const x = pos.getX(i), y = pos.getY(i), ax = Math.abs(x), L = x < 0;
     const t = Math.max(0, Math.min(1, ((ax - sh.x) * ex + (y - sh.y) * ey) / L2)), px = sh.x + t * ex, py = sh.y + t * ey;
     const onArm = ax > px - 0.035 * H && Math.hypot(ax - px, y - py) < 0.065 * H && y < sh.y + 0.05 * H && y > hand.y - 0.08 * H;
-    let bone = 0, w = 0;
-    if (onArm) { bone = L ? 3 : 4; w = Math.min(1, t * 3.5); }
-    else if (y < hip.y + 0.03 * H && (ax < 0.15 * H || y < hand.y - 0.08 * H)) { bone = L ? 1 : 2; w = Math.min(1, Math.max(0, (hip.y + 0.03 * H - y) / (0.07 * H))); }
-    si[i * 4] = bone; sw[i * 4] = w; si[i * 4 + 1] = 0; sw[i * 4 + 1] = 1 - w;
+    const up = sm(hip.y - 0.01 * H, hip.y + 0.07 * H, y); // how much the upper body carries it
+    if (onArm) { const w = Math.min(1, t * 3.5); set(i, L ? 3 : 4, w, 5, 1 - w); }
+    else if (y < hip.y + 0.03 * H && (ax < 0.15 * H || y < hand.y - 0.08 * H)) { const w = Math.min(1, Math.max(0, (hip.y + 0.03 * H - y) / (0.07 * H))); set(i, L ? 1 : 2, w, 5, (1 - w) * up, 0, (1 - w) * (1 - up)); }
+    else if (y > neck - 0.02 * H) {
+      const w = sm(neck - 0.02 * H, neck + 0.03 * H, y); set(i, 6, w, 5, 1 - w);
+      if (w > 0.95) { hb.y0 = Math.min(hb.y0, y); hb.y1 = Math.max(hb.y1, y); hb.z1 = Math.max(hb.z1, pos.getZ(i)); hb.x1 = Math.max(hb.x1, ax); }
+    } else set(i, 5, up, 0, 1 - up);
   }
   geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
   geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
   const mat = src.material.clone(); mat.skinning = true;
-  Object.assign(M, { geo, mat, rig: { sh, hip, theta: Math.atan2(hand.x - sh.x, sh.y - hand.y), armLen: Math.sqrt(L2) } });
+  Object.assign(M, { geo, mat, rig: { sh, hip, neck, head: hb, theta: Math.atan2(hand.x - sh.x, sh.y - hand.y), armLen: Math.sqrt(L2) } });
   return true;
 }
 function makeModelAvatar(kind, leiColor) {
   const M = MODELS[kind], H = M.H, r = M.rig;
   const g = new THREE.Group(), p = new THREE.Group(); g.add(p);
   const root = new THREE.Bone();
-  const joint = (x, y, rz) => { const b = new THREE.Bone(); b.position.set(x, y, 0); b.rotation.z = rz; root.add(b); return b; };
-  // the arms rest at the A-pose angle, so the pose code's "arm hanging straight down" turns them in
-  const legL = joint(-r.hip.x, r.hip.y, 0), legR = joint(r.hip.x, r.hip.y, 0), armL = joint(-r.sh.x, r.sh.y, -r.theta), armR = joint(r.sh.x, r.sh.y, r.theta);
+  const joint = (parent, x, y, rz) => { const b = new THREE.Bone(); b.position.set(x, y, 0); b.rotation.z = rz; parent.add(b); return b; };
+  // the upper body pivots at the hips and carries the arms and the head; the arms rest at the A-pose angle, so the
+  // pose code's "arm hanging straight down" turns them in
+  const spine = joint(root, 0, r.hip.y, 0), head = joint(spine, 0, r.neck - r.hip.y, 0);
+  const legL = joint(root, -r.hip.x, r.hip.y, 0), legR = joint(root, r.hip.x, r.hip.y, 0);
+  const armL = joint(spine, -r.sh.x, r.sh.y - r.hip.y, -r.theta), armR = joint(spine, r.sh.x, r.sh.y - r.hip.y, r.theta);
   const mesh = new THREE.SkinnedMesh(M.geo, M.mat);
-  mesh.add(root); mesh.updateMatrixWorld(true); mesh.bind(new THREE.Skeleton([root, legL, legR, armL, armR]));
+  mesh.add(root); mesh.updateMatrixWorld(true); mesh.bind(new THREE.Skeleton([root, legL, legR, armL, armR, spine, head]));
   mesh.castShadow = true; mesh.frustumCulled = false; p.add(mesh);
   // a lei in the chosen colour, round the neck just above the shoulders
   const lei = new THREE.MeshStandardMaterial({ color: C(leiColor), roughness: 0.75, vertexColors: true }), ny = r.sh.y / H + 0.08;
   const curve = new THREE.CatmullRomCurve3([[-0.08, ny + 0.03, 0.02], [-0.08, ny - 0.01, 0.075], [0, ny - 0.045, 0.115], [0.08, ny - 0.01, 0.075], [0.08, ny + 0.03, 0.02], [0, ny + 0.045, -0.075]].map(([x, y, z]) => new THREE.Vector3(x * H, y * H, z * H)), true);
-  const leiMesh = new THREE.Mesh(leiGeo(curve), lei); leiMesh.castShadow = true; p.add(leiMesh);
+  const leiMesh = new THREE.Mesh(leiGeo(curve), lei); leiMesh.castShadow = true; leiMesh.position.y = -r.hip.y; spine.add(leiMesh);
   const racket = new THREE.Group(); racket.position.set(0, -r.armLen, 0.03); racket.visible = false; armR.add(racket);
   add3(racket, new THREE.CylinderGeometry(0.016, 0.016, 0.3, 8), new THREE.MeshStandardMaterial({ color: 0x222226, roughness: 0.5 }), 0, -0.12, 0);
   const rh = add3(racket, new THREE.TorusGeometry(0.13, 0.013, 6, 24), new THREE.MeshStandardMaterial({ color: 0x2f6fd0, roughness: 0.4 }), 0, -0.4, 0); rh.scale.y = 1.25;
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.4, 16), new THREE.MeshBasicMaterial({ color: 0x23301c, transparent: true, opacity: 0.12, depthWrite: false }));
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.08; g.add(shadow);
   scene.add(g);
-  return { g, p, lei, legL, legR, armL, armR, skirt: null, racket, phase: 0, t: Math.random() * 10, kickUntil: 0, swingUntil: 0, gender: kind, hipAdj: 0.7 - r.hip.y, model: true };
+  return { g, p, lei, legL, legR, armL, armR, spine, head, skirt: null, racket, phase: 0, t: Math.random() * 10, kickUntil: 0, swingUntil: 0, gender: kind, hipAdj: 0.7 - r.hip.y, model: true };
 }
 // a lei of overlapping petals, shaded a little so the ruff reads; the material colour tints it
 function leiGeo(curve) {
@@ -715,7 +750,8 @@ function updateCtx() {
   }
   const el = $('ctx');
   if (el.textContent !== msg) el.textContent = msg;
-  el.hidden = !msg;
+  el.hidden = !msg || !!film;
+  updateFilmUi();
 }
 const movesMenu = $('moves'), movesBtn = $('movesBtn');
 function closeMoves() { movesMenu.hidden = true; movesBtn.setAttribute('aria-expanded', 'false'); }
@@ -755,6 +791,7 @@ function upsertRemote(peer) {
       if (pr.kiss.to === myPeer) { flash(r.nick + ' kissed you'); spawnHearts(tmp.set((r.x + me.x) / 2, me.av.g.position.y + 1.5, (r.z + me.z) / 2).clone(), 8); }
     }
   }
+  r.film = pr.film && Number.isFinite(pr.film.go) && (pr.film.tb === 0 || pr.film.tb === 1) ? { go: pr.film.go, tb: pr.film.tb } : null;
   r.race = pr.race && Number.isFinite(pr.race.go) ? { go: pr.race.go, fin: Number.isFinite(pr.race.fin) ? pr.race.fin : 0 } : null;
   r.pig = pr.pig && typeof pr.pig.to === 'string' && (pr.pig.r === 'c' || pr.pig.r === 'r') ? { to: pr.pig.to, r: pr.pig.r } : null;
   r.act = ACTS.includes(pr.act) ? pr.act : '';
@@ -983,6 +1020,309 @@ function kiss() {
   const r = remotes.get(id), both = r && r.kissTo === myPeer && performance.now() < (r.kissUntil || 0);
   spawnHearts(tmp.set((r.x + me.x) / 2, me.av.g.position.y + 1.5, (r.z + me.z) / 2).clone(), both ? 14 : 7);
 }
+// ---------- the night they started dating: an easter egg at the nook ----------
+// After dark, when two people sit at the same grey picnic table in the nook beside the Student Store, a "Watch
+// animation" button appears. It plays for everyone at that table at once (presence.film = { go: epoch ms, tb: table }):
+// the two of them talking late into the night, "Do you like me?", his answer, both hiding their faces on the table;
+// then the bench on the lawn just below, under the stars, until she leans on his shoulder. Then back to the table.
+// They sit on the stair-side bench facing the store, Jiho on the right and Isa on the left, as they did that night.
+const FILM_END = 50.4;
+let film = null, filmSeen = 0;
+const filmEl = $('film'), filmFade = $('filmFade'), filmBubbles = $('filmBubbles'), filmClock = $('filmClock'), fv = new THREE.Vector3(), fv2 = new THREE.Vector3();
+const ease = (v) => { v = Math.max(0, Math.min(1, v)); return v * v * (3 - 2 * v); };
+const ramp = (t, a, b) => ease((t - a) / (b - a));
+// who says what, when: [who, from, to, text, style]; an empty text is a "• • •" chatter bubble
+const FILM_LINES = [
+  ['J', 2.1, 3.3, '', 'dots'], ['I', 3.5, 4.6, '', 'dots'], ['I', 4.75, 5.5, 'haha', ''], ['J', 4.85, 5.55, 'hehe', ''],
+  ['I', 5.7, 6.9, '', 'dots'], ['J', 7.1, 8.2, '', 'dots'], ['J', 8.35, 9.2, 'haha', ''], ['I', 8.45, 9.2, 'hehe', ''],
+  ['I', 11.0, 13.6, 'Do you like me?', 'soft'],
+  ['J', 13.7, 14.5, '…!', ''],
+  ['J', 17.6, 19.6, 'I like you too…', ''],
+  ['J', 19.8, 22.6, 'Would you be my girlfriend?', ''],
+];
+const FILM_TALK = [[2.0, 3.4, 'J'], [3.4, 4.7, 'I'], [4.7, 5.6, 'laugh'], [5.6, 7.0, 'I'], [7.0, 8.3, 'J'], [8.3, 9.3, 'laugh']];
+const FILM_SIT = { sx: 0, sz: 0, hx: 0, hy: 0, hz: 0, aLx: -0.5, aLz: -0.04, aRx: -0.5, aRz: 0.04, lL: -1.4, lR: -1.4 };
+const blushTex = (() => {
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 64; const g = cv.getContext('2d');
+  for (const x of [30, 98]) {
+    const gr = g.createRadialGradient(x, 34, 2, x, 34, 24); gr.addColorStop(0, 'rgba(255,100,130,0.85)'); gr.addColorStop(1, 'rgba(255,100,130,0)');
+    g.fillStyle = gr; g.fillRect(x - 26, 6, 52, 56);
+    g.strokeStyle = 'rgba(214,52,92,0.85)'; g.lineWidth = 2.5; g.lineCap = 'round';
+    for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(x + k * 8 - 3, 41); g.lineTo(x + k * 8 + 4, 28); g.stroke(); }
+  }
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; return t;
+})();
+const meteorTex = (() => {
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 16; const g = cv.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 256, 0); gr.addColorStop(0, 'rgba(160,190,255,0)'); gr.addColorStop(0.85, 'rgba(225,235,255,0.8)'); gr.addColorStop(1, 'rgba(255,255,255,1)');
+  g.fillStyle = gr; g.beginPath(); g.moveTo(0, 8); g.lineTo(250, 4); g.arc(250, 8, 4, -Math.PI / 2, Math.PI / 2); g.lineTo(0, 8); g.fill();
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; return t;
+})();
+function nookTable(seatId) {
+  const st = typeof seatId === 'string' && seatId.startsWith('nk') ? seatById.get(seatId) : null;
+  if (!st) return -1;
+  let best = -1, bd = 1.6;
+  W.nook.tables.forEach(([x, z], i) => { const d = Math.hypot(st.x - x, st.z - z); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+// the table the button can play at: night, me sitting there, and someone else sitting at the same table
+function filmTable() {
+  if (!entered || film || W.timeKey !== 'night' || !MODELS.m.geo || !MODELS.f.geo || me.act !== 'sit') return -1;
+  const tb = nookTable(me.seat);
+  if (tb < 0) return -1;
+  for (const r of remotes.values()) if (r.act === 'sit' && nookTable(r.seat) === tb) return tb;
+  return -1;
+}
+function updateFilmUi() {
+  if (film) return;
+  // someone at my table just pressed play: watch it with them
+  const mine = me.act === 'sit' ? nookTable(me.seat) : -1;
+  if (mine >= 0) for (const r of remotes.values()) if (r.film && r.film.tb === mine && r.film.go !== filmSeen && Date.now() - r.film.go < 3000) { startFilm(r.film.go, mine, false); return; }
+  $('filmBtn').hidden = filmTable() < 0;
+}
+$('filmBtn').onclick = () => { const tb = filmTable(); if (tb >= 0) startFilm(Date.now() + 1300, tb, true); };
+$('filmSkip').onclick = () => endFilm();
+// a seated Jiho or Isa for the film, with a blush that can come and go
+function filmActor(kind, leiColor) {
+  const a = makeModelAvatar(kind, leiColor), r = MODELS[kind].rig, hb = r.head;
+  a.g.children.forEach((o) => { if (o.isMesh && o.geometry.type === 'CircleGeometry') o.visible = false; });
+  a.spine.rotation.order = a.head.rotation.order = 'YXZ';
+  const w = Math.min(0.3, hb.x1 * 1.3);
+  a.blush = new THREE.Mesh(new THREE.PlaneGeometry(w, w / 2), new THREE.MeshBasicMaterial({ map: blushTex, transparent: true, opacity: 0, depthWrite: false, fog: false, toneMapped: false }));
+  a.blush.position.set(0, hb.y0 + (hb.y1 - hb.y0) * 0.3 - r.neck, hb.z1 + 0.01); a.head.add(a.blush);
+  a.rig = r; a.cur = Object.assign({}, FILM_SIT);
+  return a;
+}
+function startFilm(go, tb, mine) {
+  if (film || !MODELS.m.geo || !MODELS.f.geo) return;
+  closeMoves(); if (wbOpen >= 0) closeBoard(); if (firstPerson) setFirstPerson(false);
+  filmSeen = go;
+  const [tx, tz] = W.nook.tables[tb];
+  const st0 = W.seats.find((st) => nookTable(st.id) === tb), seatY = st0 ? st0.y : groundH(tx, tz) + 0.56;
+  // the bench on the lawn just below the nook
+  let b0 = null, bd = 30;
+  for (const st of W.seats) if (/^s\d/.test(st.id)) { const d = Math.hypot(st.x - tx, st.z - (tz + 14)); if (d < bd) { bd = d; b0 = st; } }
+  const b1 = b0 && W.seats.find((st) => st !== b0 && /^s\d/.test(st.id) && Math.hypot(st.x - b0.x, st.z - b0.z) < 1.2);
+  const bench = b0 ? { x: b1 ? (b0.x + b1.x) / 2 : b0.x, z: b1 ? (b0.z + b1.z) / 2 : b0.z, rot: b0.ry, y: b0.y } : { x: tx - 0.68, z: tz, rot: Math.PI / 2, y: seatY };
+  // each wears the lei colour its player picked
+  let leiJ = '#4f8a3a', leiI = '#f28cb4';
+  if (gender === 'f') leiI = color; else leiJ = color;
+  for (const r of remotes.values()) if (r.act === 'sit' && nookTable(r.seat) === tb) { if (r.av.gender === 'f') leiI = r.color; else leiJ = r.color; }
+  const meteor = new THREE.Sprite(new THREE.SpriteMaterial({ map: meteorTex, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
+  meteor.visible = false; scene.add(meteor);
+  film = { go, tb, tx, tz, bx: tx + 0.68, seatY, bench, I: filmActor('f', leiI), J: filmActor('m', leiJ), meteor, mine, prevTime: W.timeKey, bub: new Map(), hearts: new Set(), scene2: null, music: filmMusic(go) };
+  if (W.timeKey !== 'night') W.setTime('night');
+  $('app').classList.add('filming'); filmEl.hidden = false; $('filmBtn').hidden = true; filmFade.style.opacity = '0';
+  if (mine && room && entered) room.presence({ film: { go, tb } }).catch(() => {});
+}
+function endFilm() {
+  if (!film) return;
+  const f = film; film = null;
+  for (const a of [f.I, f.J]) scene.remove(a.g);
+  scene.remove(f.meteor);
+  filmBubbles.textContent = '';
+  if (f.music) f.music.stop();
+  camera.fov = 55; camera.updateProjectionMatrix();
+  pickTime(f.prevTime);
+  for (const r of remotes.values()) r.av.g.visible = true;
+  $('app').classList.remove('filming'); filmEl.hidden = true;
+  // back to the table, out of black
+  const back = $('filmBack'); back.style.transition = 'none'; back.style.opacity = '1'; back.hidden = false;
+  requestAnimationFrame(() => requestAnimationFrame(() => { back.style.transition = 'opacity 1.4s ease'; back.style.opacity = '0'; }));
+  setTimeout(() => { back.hidden = true; }, 1600);
+  if (f.mine && room && entered) room.presence({ film: null }).catch(() => {});
+}
+// pose targets for Isa ('I') or Jiho ('J') at film time t. s is the side the other one sits on (-1: their -x).
+// Pose angles: s* spine (bow, lean), h* head (nod, turn, tilt), a* arms (forward, out), l* legs.
+function filmPose(t, who) {
+  const isI = who === 'I', s = isI ? -1 : 1, P = Object.assign({}, FILM_SIT);
+  if (t < 30) {
+    Object.assign(P, { aLx: -1.15, aLz: 0.22, aRx: -1.15, aRz: -0.22 }); // hands on the table
+    const seg = FILM_TALK.find(([a, b]) => t >= a && t < b);
+    if (seg && seg[2] === 'laugh') { P.hy = s * 0.4; P.hx = -0.12 + 0.07 * Math.sin(t * 16); P.sx = -0.04 + 0.05 * Math.sin(t * 16 + 1); }
+    else if (seg && (seg[2] === 'I') === isI) {
+      // talking: facing the other, head bobbing, the outer hand going
+      P.hy = s * 0.55; P.hx = 0.05 * Math.sin(t * 11);
+      if (isI) { P.aRx = -1.45 + 0.22 * Math.sin(t * 5.5); P.aRz = 0.25; } else { P.aLx = -1.45 + 0.22 * Math.sin(t * 5.5); P.aLz = -0.25; }
+    } else if (seg) { P.hy = s * 0.42; P.hx = 0.07 * Math.max(0, Math.sin(t * 4.2)); }
+    else if (t >= 9.3 && t < 10.3) P.hy = s * 0.08;
+    if (isI) {
+      if (t >= 10.3) { P.hy = s * 0.62; P.hz = -s * 0.08; P.sz = -s * 0.05; P.aLx = P.aRx = -1.1; P.aLz = 0.36; P.aRz = -0.36; }
+      if (t >= 14.3 && t < 17.4) P.hx = 0.14;
+      if (t >= 22.7 && t < 23.94) P.hx = 0.3 * Math.pow(Math.sin(Math.PI * (t - 22.7) / 0.62), 2); // two nods
+    } else {
+      if (t >= 10.3 && t < 13.6) P.hy = t < 11.7 ? s * 0.12 : s * 0.35;
+      if (t >= 13.6 && t < 14.3) { P.hy = s * 0.6; P.hx = -0.16; P.sx = -0.06; }
+      if (t >= 14.3 && t < 17.1) { P.hy = -s * 0.32; P.hx = 0.42; P.aRx = -0.35; P.aRz = 2.6 + 0.09 * Math.sin(t * 17); } // looks down, scratches his head
+      if (t >= 17.1 && t < 24.6) { P.hy = s * 0.55; P.hx = 0.06 + (t > 17.6 && t < 22.6 ? 0.035 * Math.sin(t * 10) : 0); }
+      if (t >= 23.3 && t < 24.6) P.sx = -0.05;
+    }
+    // both hide their faces on the table, turned away from each other
+    const d = ramp(t, 24.6, 26.0);
+    if (d > 0) {
+      const Hd = { sx: 1.0 + 0.012 * Math.sin(t * 2.1 + s), sz: 0, hx: 0.1, hy: -s * 1.45, hz: 0, aLx: -1.95, aLz: 0.6, aRx: -1.95, aRz: -0.6 };
+      for (const k in Hd) P[k] += (Hd[k] - P[k]) * d;
+      if (isI && t > 26.4) { P.lL = -1.4 + 0.18 * Math.sin(t * 3.4); P.lR = -1.4 - 0.18 * Math.sin(t * 3.4); } // her feet swing under the table
+    }
+  } else {
+    // the bench under the stars: leaning back a little, looking up
+    Object.assign(P, { sx: -0.1, hx: -0.55, aLx: -0.45, aRx: -0.45 });
+    if (isI) {
+      const l = ramp(t, 40.0, 42.6);
+      P.sz = -s * 0.34 * l; P.hz = -s * 0.34 * l; P.hx = -0.55 + 0.5 * l; P.hy = s * 0.22 * l; P.sx = -0.1 + 0.06 * l;
+      P.aLx = -0.45 - 0.2 * l; P.aLz = -0.04 + 0.34 * l; // her hand on his arm
+    } else {
+      const l = ramp(t, 43.0, 44.6);
+      P.hz = -s * 0.14 * l; P.hx = -0.55 + 0.22 * l;
+    }
+  }
+  return P;
+}
+function poseActor(a, P, dt, snap) {
+  const k = snap ? 1 : 1 - Math.exp(-7 * dt), c = a.cur;
+  for (const key in P) c[key] += (P[key] - c[key]) * k;
+  a.spine.rotation.x = c.sx; a.spine.rotation.z = c.sz;
+  a.head.rotation.set(c.hx, c.hy, c.hz);
+  a.armL.rotation.x = c.aLx; a.armL.rotation.z = c.aLz; a.armR.rotation.x = c.aRx; a.armR.rotation.z = c.aRz;
+  a.legL.rotation.x = c.lL; a.legR.rotation.x = c.lR;
+}
+// camera: [from, to, start position, end position, start look, end look, fov] in their bench's frame: scene 1 is
+// metres in front of them (toward the store wall, 2.28 m away), height above the seat, and along the bench toward
+// Isa; scene 2 is x along the lawn bench, height, z the way they face
+const FILM_SHOTS = [
+  [-9, 4.2, [1.6, 2.4, 6.0], [1.3, 1.8, 4.4], [0.6, 0.5, 0], [0.6, 0.5, 0], 50],
+  [4.2, 9.6, [1.95, 0.8, -0.45], [1.95, 0.75, 0.55], [0, 0.62, -0.12], [0, 0.62, 0.12], 44],
+  [9.6, 13.6, [1.6, 0.98, -0.75], [1.5, 0.95, -0.62], [0, 0.84, 0.26], [0, 0.84, 0.26], 34],
+  [13.6, 17.4, [1.6, 0.98, 0.8], [1.5, 0.95, 0.68], [0, 0.8, -0.27], [0, 0.8, -0.27], 34],
+  [17.4, 22.6, [1.95, 0.86, -0.3], [1.9, 0.83, -0.18], [0, 0.74, 0], [0, 0.74, 0], 42],
+  [22.6, 24.6, [1.5, 0.95, -0.66], [1.42, 0.93, -0.58], [0, 0.84, 0.26], [0, 0.84, 0.26], 32],
+  [24.6, 27.3, [0.7, 0.55, -1.8], [0.65, 0.5, -1.6], [0.55, 0.42, -0.31], [0.55, 0.42, -0.31], 36],
+  [27.3, 30, [0.7, 0.55, 1.8], [0.65, 0.5, 1.6], [0.55, 0.42, 0.31], [0.55, 0.42, 0.31], 36],
+  [30, 39.2, [0.1, 0.32, -2.5], [0.05, 0.42, -2.15], [0, 0.95, 3], [0, 6.5, 5], 62],
+  [39.2, 45.0, [-0.15, 0.3, 1.9], [-0.1, 0.36, 1.6], [0, 0.85, 0], [0, 0.88, 0], 44],
+  [45.0, 50.4, [0.05, 0.95, -1.7], [0, 1.85, -3.0], [0, 0.9, 0.3], [0, 1.55, 3.5], 58],
+];
+function filmPoint(f, t, v, out) {
+  if (t < 30) return out.set(f.bx - v[0], f.seatY + v[1], f.tz + v[2]);
+  const [x, z] = W.toWorld(f.bench, v[0], v[2]);
+  return out.set(x, f.bench.y + v[1], z);
+}
+function stepFilm(dt) {
+  const f = film, t = (Date.now() - f.go) / 1000;
+  if (t >= FILM_END) { endFilm(); return; }
+  filmFade.style.opacity = String(t < 15 ? (t < 0 ? ramp(t, -1.2, -0.5) : 1 - ramp(t, 0, 1.3)) : Math.max(ramp(t, 28.8, 30) * (1 - ramp(t, 31, 32.4)), ramp(t, 48.6, 50.2)));
+  // where they sit: side by side on the bench facing the table, then on the lawn bench
+  const s2 = t >= 30, snap = f.scene2 !== s2;
+  if (snap) { f.scene2 = s2; W.setStars(s2 ? 1.45 : 1); }
+  for (const [a, side] of [[f.I, 1], [f.J, -1]]) {
+    if (!s2) { a.g.position.set(f.bx, f.seatY, f.tz + side * 0.31); a.g.rotation.y = -Math.PI / 2; }
+    else { const [x, z] = W.toWorld(f.bench, side * 0.28, 0.02); a.g.position.set(x, f.bench.y, z); a.g.rotation.y = f.bench.rot; }
+    a.p.position.y = -0.68 + a.hipAdj;
+    poseActor(a, filmPose(t, a === f.I ? 'I' : 'J'), dt, snap);
+  }
+  // blushing
+  const kb = 1 - Math.exp(-3 * dt);
+  const bI = !s2 && t >= 10.8 ? (t < 13.8 ? 0.45 : t >= 22.9 ? 1 : 0.2) : 0, bJ = !s2 && t >= 14.3 ? 1 : 0;
+  f.I.blush.material.opacity += (bI - f.I.blush.material.opacity) * kb; f.J.blush.material.opacity += (bJ - f.J.blush.material.opacity) * kb;
+  // a few hearts
+  const heart = (key, at, a, n) => { if (t >= at && !f.hearts.has(key)) { f.hearts.add(key); a.head.getWorldPosition(fv); fv.y += a.rig.head.y1 - a.rig.neck + 0.05 - 1.9; spawnHearts(fv.clone(), n); } };
+  heart('nod', 23.4, f.I, 5); heart('table', 26.8, f.J, 3); heart('lean', 43.2, f.I, 2);
+  // camera
+  const sh = FILM_SHOTS.find((x) => t < x[1]) || FILM_SHOTS[FILM_SHOTS.length - 1];
+  const u = ease((t - Math.max(sh[0], t < 30 ? 0 : 30)) / (sh[1] - Math.max(sh[0], t < 30 ? 0 : 30)));
+  filmPoint(f, t, sh[2].map((v, i) => v + (sh[3][i] - v) * u), camera.position);
+  camera.position.y = Math.max(camera.position.y, groundH(camera.position.x, camera.position.z) + 0.35);
+  const lu = sh[0] === 30 ? ease((t - 31.5) / 7) : u;
+  camera.lookAt(filmPoint(f, t, sh[4].map((v, i) => v + (sh[5][i] - v) * lu), fv2));
+  if (camera.fov !== sh[6]) { camera.fov = sh[6]; camera.updateProjectionMatrix(); }
+  me.av.g.visible = false;
+  for (const r of remotes.values()) r.av.g.visible = false;
+  // a shooting star while they look up
+  const mu = (t - 35) / 0.9;
+  f.meteor.visible = mu > 0 && mu < 1;
+  if (f.meteor.visible) {
+    const a = filmPoint(f, t, [-16, 30, 44], fv), b = filmPoint(f, t, [10, 21, 48], new THREE.Vector3());
+    f.meteor.position.lerpVectors(a, b, mu);
+    const pa = a.clone().project(camera), pb = b.project(camera);
+    f.meteor.material.rotation = Math.atan2((pb.y - pa.y) * canvas.clientHeight, (pb.x - pa.x) * canvas.clientWidth);
+    f.meteor.scale.set(9, 0.45, 1); f.meteor.material.opacity = Math.sin(mu * Math.PI);
+  }
+  // speech bubbles over their heads
+  FILM_LINES.forEach(([who, t0, t1, text, cls], i) => {
+    let el = f.bub.get(i);
+    if (t < t0 || t > t1 + 0.4) { if (el) { el.remove(); f.bub.delete(i); } return; }
+    if (!el) {
+      el = document.createElement('div'); el.className = 'fb ' + cls;
+      if (text) el.textContent = text; else el.innerHTML = '<i></i><i></i><i></i>';
+      filmBubbles.append(el); f.bub.set(i, el);
+    }
+    el.classList.toggle('on', t < t1);
+    // over the speaker's head; in a close-up, where that is off the top, beside the head instead
+    const a = who === 'I' ? f.I : f.J, cw = canvas.clientWidth, ch = canvas.clientHeight;
+    a.head.localToWorld(fv.set(0, a.rig.head.y1 - a.rig.neck + 0.1, 0)).project(camera);
+    a.head.localToWorld(fv2.set(0, (a.rig.head.y1 - a.rig.neck) * 0.55, 0)).project(camera);
+    let x = (fv.x + 1) / 2 * cw, y = (1 - fv.y) / 2 * ch;
+    const top = ch * 0.09 + el.offsetHeight + 14;
+    if (y < top) {
+      const hx = (fv2.x + 1) / 2 * cw, hr = Math.abs(y - (1 - fv2.y) / 2 * ch);
+      x = hx + Math.sign(hx - cw / 2 || 1) * (hr * 0.9 + el.offsetWidth / 2);
+      y = Math.max(top, (1 - fv2.y) / 2 * ch - hr * 0.2);
+    }
+    el.style.left = Math.max(el.offsetWidth / 2 + 12, Math.min(cw - el.offsetWidth / 2 - 12, x)) + 'px'; el.style.top = y + 'px';
+  });
+  // the hours slipping by while they talk
+  const co = t > 1.8 && t < 9.9 ? Math.min(ramp(t, 1.8, 2.4), 1 - ramp(t, 9.3, 9.9)) : 0;
+  filmClock.style.opacity = String(co);
+  if (co > 0) { const m = Math.round(21 * 60 + 40 + Math.max(0, Math.min(1, (t - 2) / 7.3)) * 162) % 1440; filmClock.textContent = '☾ ' + String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+  if (f.music) f.music.tick();
+}
+// a soft music box: talk, a hush for the question, his answer resolving home, then the stars
+function filmMusic(go) {
+  let ctx;
+  try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; }
+  const out = ctx.createGain(), lp = ctx.createBiquadFilter(), dl = ctx.createDelay(), fb = ctx.createGain(), wet = ctx.createGain();
+  out.gain.value = 0.85; lp.type = 'lowpass'; lp.frequency.value = 5200; dl.delayTime.value = 0.31; fb.gain.value = 0.3; wet.gain.value = 0.25;
+  out.connect(lp); lp.connect(ctx.destination); lp.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(ctx.destination);
+  const N = []; // [time, midi, length, volume]
+  const ARP = { F: [53, 60, 65, 69, 72, 69, 65, 60], Dm: [50, 57, 62, 65, 69, 65, 62, 57], Bb: [46, 53, 58, 62, 65, 62, 58, 53], C: [48, 55, 60, 64, 67, 64, 60, 55], Am: [45, 52, 57, 60, 64, 60, 57, 52] };
+  const arp = (t0, ch, step, vol, up) => ARP[ch].forEach((m, i) => N.push([t0 + i * step, m + (up || 0), 1.6, vol]));
+  const mel = (t0, list, beat) => { let tt = t0; for (const [m, b] of list) { if (m) N.push([tt, m, b * beat + 0.8, 0.075]); tt += b * beat; } };
+  arp(0, 'F', 0.4, 0.045); arp(3.2, 'Dm', 0.4, 0.045); arp(6.4, 'Bb', 0.4, 0.045);
+  mel(0, [[72, 2], [69, 1], [70, 1], [74, 2], [72, 1], [69, 1], [70, 2], [69, 1], [65, 1]], 0.8);
+  N.push([10.0, 77, 2.4, 0.05], [11.0, 45, 3, 0.04], [11.0, 52, 3, 0.03], [11.05, 76, 2.4, 0.055], [12.4, 74, 2.4, 0.05]);
+  N.push([13.7, 84, 0.4, 0.05], [13.82, 79, 0.5, 0.05]);
+  arp(14.4, 'Bb', 0.4, 0.03, 12); mel(14.4, [[67, 1], [70, 1], [74, 1], [72, 1]], 0.8);
+  arp(17.6, 'C', 0.4, 0.045); N.push([20.8, 48, 2.2, 0.045], [20.8, 55, 2.2, 0.035], [20.8, 70, 2.2, 0.035], [21.6, 76, 1.4, 0.04]);
+  [72, 77, 81, 84].forEach((m, i) => N.push([22.65 + i * 0.09, m, 1.2, 0.05]));
+  arp(22.6, 'F', 0.4, 0.05); arp(25.8, 'Bb', 0.4, 0.045);
+  mel(22.6, [[77, 2], [76, 1], [74, 1], [72, 3], [69, 1]], 0.8);
+  [['F', 31], ['Am', 34.2], ['Bb', 37.4], ['C', 40.6], ['F', 43.8]].forEach(([ch, t0]) => arp(t0, ch, 0.4, 0.035, 12));
+  mel(31.4, [[81, 2], [79, 2], [77, 2], [76, 2], [74, 2], [72, 1.5]], 0.8);
+  N.push([40.6, 77, 1.4, 0.07], [41.4, 79, 1.4, 0.07], [42.2, 81, 2, 0.07], [43.8, 84, 2.6, 0.075], [45.4, 81, 2, 0.065], [47.0, 77, 3, 0.07], [47.0, 65, 3, 0.05], [47.0, 72, 3, 0.05]);
+  [84, 86, 89, 91, 93].forEach((m, i) => N.push([35.0 + i * 0.06, m, 0.6, 0.03]));
+  N.sort((a, b) => a[0] - b[0]);
+  const base = ctx.currentTime + (go - Date.now()) / 1000;
+  out.gain.setValueAtTime(0.85, Math.max(ctx.currentTime, base + 48.6)); out.gain.linearRampToValueAtTime(0, Math.max(ctx.currentTime, base + 50.2));
+  let i = 0;
+  return {
+    tick() {
+      const until = ctx.currentTime + 1.2;
+      for (; i < N.length && base + N[i][0] < until; i++) {
+        const [at, m, len, vol] = N[i], st = base + at;
+        if (st < ctx.currentTime - 0.05 || (at >= 28.8 && at < 30.5)) continue;
+        const fq = 440 * Math.pow(2, (m - 69) / 12), fade = at > 26 && at < 30 ? 1 - (at - 26) / 4 : 1;
+        for (const [mul, v, dec] of [[1, 1, len], [2, 0.28, len * 0.4], [3, 0.08, len * 0.25]]) {
+          const o = ctx.createOscillator(), g = ctx.createGain(), s0 = Math.max(st, ctx.currentTime);
+          o.type = 'sine'; o.frequency.value = fq * mul;
+          g.gain.setValueAtTime(0, s0); g.gain.linearRampToValueAtTime(vol * v * fade, s0 + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, s0 + dec);
+          o.connect(g); g.connect(out); o.start(s0); o.stop(s0 + dec + 0.05);
+        }
+      }
+    },
+    stop() { try { out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(0, ctx.currentTime, 0.15); setTimeout(() => ctx.close(), 800); } catch (e) {} },
+  };
+}
+
 // ---------- race on the track ----------
 // Stand behind the start/finish line on the home straight and press L. Everyone else in the start box joins the same
 // race; a shared 3-2-1 countdown, then one lap. Distance only counts on the track, so cutting the infield doesn't help.
@@ -1261,6 +1601,16 @@ function chirp() {
     o.connect(g).connect(ac.destination); o.start(s); o.stop(s + 0.1);
   }
 }
+// after dark: a field cricket, a few quick pulses twice over
+function cricket() {
+  const t0 = ac.currentTime, f = 4300 + Math.random() * 700, n = 3 + (Math.random() * 3 | 0);
+  for (let k = 0; k < 2; k++) for (let i = 0; i < n; i++) {
+    const o = ac.createOscillator(), g = ac.createGain(), s = t0 + k * 0.45 + i * 0.045;
+    o.type = 'sine'; o.frequency.value = f;
+    g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(0.016, s + 0.008); g.gain.linearRampToValueAtTime(0, s + 0.03);
+    o.connect(g).connect(ac.destination); o.start(s); o.stop(s + 0.04);
+  }
+}
 $('fpBtn').onclick = () => setFirstPerson(!firstPerson);
 $('soundBtn').onclick = () => setSound(!(ac && ac.state === 'running'));
 
@@ -1269,6 +1619,7 @@ const keys = new Set();
 const typing = () => document.activeElement && (document.activeElement.tagName === 'INPUT');
 addEventListener('keydown', (e) => {
   if (typing()) return;
+  if (film) { if (e.code === 'Escape') endFilm(); if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); return; }
   if (wbOpen >= 0) { if (e.code === 'KeyE' || e.code === 'Escape') { e.preventDefault(); closeBoard(); } return; }
   if (e.code === 'KeyE' && entered && !e.repeat) { toggleBoard(); return; }
   if (e.code === 'KeyK' && entered && !e.repeat) { kiss(); return; }
@@ -1376,6 +1727,7 @@ function frame() {
   }
   if (joy.id !== null) { ix += joy.x; iz -= joy.y; }
   if (race && race.phase === 'count') { ix = 0; iz = 0; }
+  if (film) { ix = 0; iz = 0; }
   const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.95;
   // carts someone else is driving glide toward the pose they report
   for (const c of W.carts) {
@@ -1495,12 +1847,14 @@ function frame() {
   if (ac && ac.state === 'running') {
     windFilter.frequency.setTargetAtTime(300 + gust * 700, ac.currentTime, 0.3);
     windGain.gain.setTargetAtTime(0.08 + gust * 0.22, ac.currentTime, 0.4);
-    if (now > nextBird) { if (nextBird) chirp(); nextBird = now + 4000 + Math.random() * 9000; }
+    const night = W.timeKey === 'night';
+    if (now > nextBird) { if (nextBird) (night ? cricket : chirp)(); nextBird = now + (night ? 1200 + Math.random() * 2600 : 4000 + Math.random() * 9000); }
   }
 
   // camera
   me.av.g.visible = !firstPerson;
-  if (firstPerson) {
+  if (film) stepFilm(dt);
+  else if (firstPerson) {
     const eyeY = me.av.g.position.y + me.av.p.position.y + (me.act === 'lie' ? 0.32 : 1.62);
     const dx = -Math.sin(camYaw), dz = -Math.cos(camYaw), cp = Math.cos(fpPitch);
     camera.position.set(me.x + dx * 0.14, eyeY, me.z + dz * 0.14);

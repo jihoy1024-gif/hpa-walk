@@ -37,6 +37,7 @@ function createWorld(canvas) {
   sun.shadow.bias = -0.0003;
   sun.shadow.normalBias = 0.05;
   scene.add(sun, sun.target);
+  const nightLights = [], nightGlows = []; // { light, I } and { mat, I }: switched on by the Night setting
   const sunDir = new THREE.Vector3(0, 1, 0), lightDir = new THREE.Vector3(0, 1, 0);
 
   // ---------- map frame ----------
@@ -1861,6 +1862,20 @@ function createWorld(canvas) {
     for (let x = 209.7; x <= 212.95; x += 1.1) parts.push({ g: new THREE.BoxGeometry(0.05, 1.0, 0.05).translate(x - U.x, yU + 0.5, -80.1 - U.z), c: C('#5d6166') });
     const gpt = greyPicnicGeo();
     for (const [tx, tz] of NOOK.tables) { const t = new THREE.Mesh(gpt, trimMat); t.position.set(tx, yL + 0.06, tz); t.rotation.y = Math.PI / 2; t.castShadow = true; t.receiveShadow = true; scene.add(t); box(tx, tz, 0.85, 1.15, 0); }
+    // a black iron lantern on the store wall between the two tables, warm after dark
+    {
+      const lz = (NOOK.tables[0][1] + NOOK.tables[1][1]) / 2, iron = new THREE.MeshStandardMaterial({ color: C('#26262a'), roughness: 0.6, metalness: 0.4 });
+      const glow = new THREE.MeshStandardMaterial({ color: C('#efe2c4'), emissive: C('#ffb45e'), emissiveIntensity: 0, roughness: 0.4 });
+      const put = (geo, mat, x, y) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, lz); m.castShadow = mat === iron; scene.add(m); };
+      put(new THREE.BoxGeometry(0.06, 0.06, 0.06), iron, 209.66, yL + 2.62);
+      put(new THREE.BoxGeometry(0.34, 0.03, 0.03), iron, 209.8, yL + 2.62);
+      put(new THREE.BoxGeometry(0.2, 0.3, 0.2), glow, 209.95, yL + 2.38);
+      put(new THREE.ConeGeometry(0.17, 0.12, 4).rotateY(Math.PI / 4), iron, 209.95, yL + 2.59);
+      put(new THREE.BoxGeometry(0.22, 0.03, 0.22), iron, 209.95, yL + 2.22);
+      nightGlows.push({ mat: glow, I: 2.6 });
+      const pl = new THREE.PointLight(0xffc285, 0, 11, 2); pl.position.set(210.15, yL + 2.3, lz); scene.add(pl);
+      nightLights.push({ light: pl, I: 2.4 });
+    }
     const pm = new THREE.Mesh(mergeGeoms(parts), trimMat); pm.castShadow = true; pm.receiveShadow = true; g.add(pm);
   })();
 
@@ -2506,25 +2521,38 @@ function createWorld(canvas) {
   // ---------- sky ----------
   const skyUniforms = {
     uSun: { value: sunDir }, uZenith: { value: new THREE.Color() }, uHorizon: { value: new THREE.Color() }, uSunCol: { value: new THREE.Color() },
-    uCloud: { value: new THREE.Color() }, uTime: { value: 0 }, uCover: { value: 0.45 }, uRainbow: { value: 0 },
+    uCloud: { value: new THREE.Color() }, uTime: { value: 0 }, uCover: { value: 0.45 }, uRainbow: { value: 0 }, uStars: { value: 0 }, uNight: { value: 0 },
   };
   const sky = new THREE.Mesh(new THREE.SphereGeometry(15000, 48, 24), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false, uniforms: skyUniforms,
     vertexShader: 'varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
     fragmentShader: `varying vec3 vDir;
-      uniform vec3 uSun, uZenith, uHorizon, uSunCol, uCloud; uniform float uTime, uCover, uRainbow;
+      uniform vec3 uSun, uZenith, uHorizon, uSunCol, uCloud; uniform float uTime, uCover, uRainbow, uStars, uNight;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
         return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }
       float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 6; i++){ v += a * noise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return v; }
       vec3 hue(float h){ return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0); }
+      float hash3(vec3 p){ return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
+      // one star at a random spot in some of the cells of a 3D grid the sky dome cuts through; brighter ones are rarer
+      float starLayer(vec3 d, float scale, float keep, float rad){
+        vec3 p = d * scale, c = floor(p), f = fract(p);
+        float h = hash3(c);
+        if (h < keep) return 0.0;
+        vec3 o = vec3(hash3(c + 17.3), hash3(c + 41.9), hash3(c + 73.1)) * 0.6 + 0.2;
+        float b = pow((h - keep) / (1.0 - keep), 2.4);
+        float tw = 0.78 + 0.22 * sin(uTime * (1.3 + h * 3.0) + h * 70.0);
+        return (0.3 + 2.8 * b) * tw * smoothstep(rad, rad * 0.2, length(f - o));
+      }
       void main(){
         vec3 d = normalize(vDir);
         float y = d.y;
         vec3 col = mix(uHorizon, uZenith, pow(smoothstep(-0.02, 0.6, y), 0.55));
         float sd = max(dot(d, uSun), 0.0);
-        col += uSunCol * (pow(sd, 5.0) * 0.16 + pow(sd, 40.0) * 0.35);
-        col += uSunCol * smoothstep(0.99955, 0.99985, sd) * 14.0;
+        col += uSunCol * (pow(sd, 5.0) * 0.16 + pow(sd, 40.0) * 0.35) * (1.0 - 0.75 * uNight);
+        // the sun, or at night a smaller mottled moon
+        float disc = mix(smoothstep(0.99955, 0.99985, sd), smoothstep(0.99988, 0.99994, sd), uNight);
+        col += uSunCol * disc * mix(14.0, 2.6 * (0.78 + 0.3 * noise(d.xz * 700.0 + 3.0)), uNight);
         float ang = degrees(acos(clamp(dot(d, -uSun), -1.0, 1.0)));
         float rb = (ang - 40.4) / 2.3;
         float above = smoothstep(0.0, 0.05, y);
@@ -2533,6 +2561,15 @@ function createWorld(canvas) {
         if (rb2 > 0.0 && rb2 < 1.0) col += hue(0.78 * rb2) * sin(rb2 * 3.14159) * uRainbow * 0.06 * above;
         if (ang < 40.4) col += vec3(0.02) * uRainbow * above;
         if (y > 0.0) {
+          if (uStars > 0.0) {
+            // the Milky Way: a soft band across the sky, thick with faint stars
+            vec3 mn = normalize(vec3(0.92, 0.12, -0.3)), e1 = normalize(cross(mn, vec3(0.0, 1.0, 0.0))), e2 = cross(mn, e1);
+            float md = dot(d, mn), band = exp(-md * md / 0.028);
+            float dust = fbm(vec2(dot(d, e1), dot(d, e2)) * 6.0 + vec2(md * 17.0, -md * 11.0) + 11.0);
+            float s = starLayer(d, 150.0, 0.84 - 0.12 * band, 0.17) + 0.45 * starLayer(d.zxy, 290.0, 0.88 - 0.14 * band, 0.26);
+            vec3 sc = mix(vec3(0.76, 0.83, 1.0), vec3(1.0, 0.9, 0.76), hash3(floor(d * 150.0) + 5.0));
+            col += (sc * s + vec3(0.5, 0.56, 0.82) * band * (0.25 + smoothstep(0.35, 0.8, dust)) * 0.17) * uStars * smoothstep(0.0, 0.16, y);
+          }
           vec2 uv = d.xz / (y + 0.1) * 1.5 + vec2(uTime * 0.005, uTime * 0.0025);
           float n = fbm(uv);
           float cov = smoothstep(1.0 - uCover, 1.0 - uCover + 0.25, n);
@@ -2613,7 +2650,14 @@ function createWorld(canvas) {
     afternoon: { label: 'Afternoon', az: 225, el: 42, sun: '#fff4e4', sunI: 3.0, sky: '#c6dcf4', ground: '#56683a', hemiI: 0.9, zenith: '#2a63c9', horizon: '#bfd7ee', fog: '#c2d6e8', haze: '#b2c8de', hazeAmt: 0.3, cloud: '#ffffff', cover: 0.5, rainbow: 0.6, exposure: 0.9 },
     golden: { label: 'Golden hour', az: 252, el: 9, sun: '#ffc48c', sunI: 2.8, sky: '#ccd5ea', ground: '#5c5a36', hemiI: 0.72, zenith: '#3b67b6', horizon: '#f2d4b8', fog: '#e4d3c2', haze: '#d8c6bc', hazeAmt: 0.3, cloud: '#ffe8d2', cover: 0.42, rainbow: 0.75, exposure: 1.0 },
     sunset: { label: 'Sunset', az: 258, el: 1.5, sun: '#ff9466', sunI: 1.5, sky: '#b9a6c6', ground: '#4b4232', hemiI: 0.62, zenith: '#3a4a8c', horizon: '#ffb194', fog: '#e4b2a6', haze: '#d6a6a6', hazeAmt: 0.28, cloud: '#ffc0ae', cover: 0.4, rainbow: 0, exposure: 1.1 },
+    // a clear upland night: moon over Mauna Kea, stars to the horizon, lamps and windows lit
+    night: { label: 'Night', az: 128, el: 38, sun: '#a8bcef', sunI: 0.4, sky: '#41508a', ground: '#161c15', hemiI: 0.44, zenith: '#02061a', horizon: '#17223f', fog: '#10182b', haze: '#17203a', hazeAmt: 0.5, cloud: '#2f3953', cover: 0.16, rainbow: 0, exposure: 1.3, stars: 1, night: 1 },
   };
+  // after dark the clerestory glass glows warm: panes lit, frames dark
+  const glassGlowTex = canvasTex(512, 128, (g, W, H) => {
+    g.fillStyle = '#000000'; g.fillRect(0, 0, W, H);
+    for (let x = 0; x < W; x += 64) { const gr = g.createLinearGradient(0, 8, 0, H - 8); gr.addColorStop(0, '#ffe2b0'); gr.addColorStop(1, '#c98a4a'); g.fillStyle = gr; g.fillRect(x + 6, 8, 52, H - 16); }
+  });
   let timeKey = 'golden';
   function setTime(key) {
     const T = TIMES[key] || TIMES.golden; timeKey = TIMES[key] ? key : 'golden';
@@ -2633,6 +2677,11 @@ function createWorld(canvas) {
     hazeUniforms.uHaze.value.copy(C(T.haze)); hazeUniforms.uHazeAmt.value = T.hazeAmt;
     const bandCol = C(T.cloud).lerp(C(T.horizon), 0.25);
     bandSprites.forEach((s) => s.material.color.copy(bandCol));
+    skyUniforms.uStars.value = T.stars || 0; skyUniforms.uNight.value = T.night || 0;
+    for (const n of nightLights) n.light.intensity = T.night ? n.I : 0;
+    for (const n of nightGlows) n.mat.emissiveIntensity = T.night ? n.I : 0;
+    const gl = wallMats.glass;
+    if (gl) { if (!gl.emissiveMap) { gl.emissiveMap = glassGlowTex; gl.needsUpdate = true; } gl.emissive.set(T.night ? 0x9a7650 : 0x000000); }
     return T;
   }
   setTime(timeKey);
@@ -2751,7 +2800,8 @@ function createWorld(canvas) {
   const field = { x: TRACK.x, z: TRACK.z, rot: TRACK.rot, halfL: FIELD_L / 2, halfW: FIELD_W / 2, rIn: R_IN, rOut: R_OUT, TL, y: groundH(0, 0) };
   tennis.inside = (x, z) => { const [lx, lz] = toLocal(tennis, x, z); return Math.abs(lx) < tennis.hw - 0.3 && Math.abs(lz) < tennis.hd - 0.3; };
   return { scene, renderer, camera, groundH, colliders, flags, C, spawn, bounds, update, setTime, setQuality, times: TIMES, get timeKey() { return timeKey; },
-    seats, carts, placeCart, cartSeat, field, tennis, pool, inPool, cat: cat.g, toLocal, toWorld, roomAt, boards };
+    seats, carts, placeCart, cartSeat, field, tennis, pool, inPool, cat: cat.g, toLocal, toWorld, roomAt, boards, nook: NOOK,
+    setStars: (v) => { skyUniforms.uStars.value = v; } };
 }
 
 window.HPA = { createWorld };
