@@ -79,27 +79,29 @@ function createWorld(canvas) {
     { at: [440, 255], w: 60, d: 40, phi: 0, h: 3.3, wall: 'wood', ends: 'stone', roof: 'hip', rise: 0.22, solar: 2, label: 'Castle Lecture Hall' },
     { at: [537, 265], w: 105, d: 40, phi: 14, h: 3.3, wall: 'wood', ends: 'stone', roof: 'hip', rise: 0.22, solar: 2, lanai: 1, label: 'English Building' },
     { at: [525, 336], w: 125, d: 54, phi: 18, h: 3.5, wall: 'wood', ends: 'stone', roof: 'hip', rise: 0.22, solar: 2, lanai: 1, label: 'Technology & Learning Center' },
-    { at: [648, 350], w: 86, d: 38, phi: 24, h: 3.1, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1, label: 'Social Studies Building' },
-    { at: [651, 437], w: 90, d: 42, phi: 22, h: 3.2, wall: 'stone', ends: 'stone', roof: 'shed', rise: 0.3, lanai: 1, name: 'ml', label: 'Modern Language Building' },
-    { at: [742, 412], w: 70, d: 38, phi: 30, h: 3.1, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1 },
-    { at: [776, 487], w: 115, d: 40, phi: 46, h: 3.1, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1, label: 'Atherton Science Building' },
-    { at: [884, 437], w: 96, d: 54, phi: 20, h: 3.4, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1, label: 'Wishard Administration' },
-    { at: [915, 572], w: 96, d: 32, phi: 22, h: 3.2, wall: 'wood', ends: 'stone', roof: 'shed', rise: 0.25, lanai: 1, label: 'Math Building' },
-    { at: [1015, 468], w: 72, d: 66, phi: 8, h: 3.4, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1, label: 'Dyer Memorial Library' },
+    { at: [648, 350], w: 86, d: 38, phi: 24, h: 3.1, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1, cls: 1, label: 'Social Studies Building' },
+    { at: [651, 437], w: 90, d: 42, phi: 22, h: 3.2, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1, cls: 1, name: 'ml', label: 'Modern Language Building' },
+    { at: [742, 412], w: 70, d: 38, phi: 30, h: 3.1, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1, cls: 1, lockers: 1 },
+    { at: [776, 487], w: 115, d: 40, phi: 46, h: 3.1, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1, cls: 1, lockers: 1, label: 'Atherton Science Building' },
+    { at: [884, 437], w: 96, d: 54, phi: 20, h: 3.3, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.2, eave: 2.2, lanai: 1, name: 'wishard', label: 'Wishard Administration' },
+    { at: [941, 486], w: 52, d: 22, phi: 20, h: 3.0, wall: 'open', roof: 'shed', rise: 0.12, eave: 0.6, open: 1 }, // Becky Carter Student Pavilion
+    { at: [915, 572], w: 96, d: 32, phi: 22, h: 3.2, wall: 'wood', ends: 'stone', roof: 'shed', rise: 0.2, lanai: 1, cls: 1, lockers: 1, label: 'Math Building' },
+    { at: [1015, 486], w: 74, d: 32, phi: 8, h: 3.6, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.42, eave: 0.3, eaveEnd: 1.4, logEnds: 1, label: 'Dyer Memorial Library' },
+    { at: [1011, 452], w: 40, d: 30, phi: 98, h: 3.6, wall: 'wood', ends: 'glass', roof: 'gable', rise: 0.42, eave: 0.3, eaveEnd: 1.4, logEnds: 1 },
     // student union with floor-to-ceiling glass, and Taylor Commons (dining)
     { at: [1065, 555], w: 66, d: 54, phi: 3, h: 6.4, wall: 'glass', ends: 'wood', roof: 'hip', rise: 0.18, label: 'Ko Kākou Hale' },
     { at: [1150, 452], w: 122, d: 36, phi: 5, h: 6.4, wall: 'wood', ends: 'stone', roof: 'hip', rise: 0.24 },
     { at: [1150, 532], w: 100, d: 66, phi: 2, h: 6.4, wall: 'wood', ends: 'stone', roof: 'hip', rise: 0.2, solar: 1, label: 'Taylor Commons' },
     { at: [1258, 497], w: 74, d: 46, phi: 3, h: 6.0, wall: 'wood', ends: 'stone', roof: 'hip', rise: 0.24 },
     // north edge
-    { at: [515, 112], w: 82, d: 36, phi: 32, h: 4.0, wall: 'wood', ends: 'wood', roof: 'gable', rise: 0.26, roofColor: '#b9b8b2', name: 'chapel', label: 'Davies Memorial Chapel' },
+    { at: [515, 112], w: 82, d: 36, phi: 32, h: 5.2, wall: 'chapel', ends: 'chapel', roof: 'gable', rise: 0.16, eave: 2.2, roofColor: '#b9b8b2', name: 'chapel', label: 'Davies Memorial Chapel' },
     { at: [916, 186], w: 76, d: 40, phi: -15, h: 3.3, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1, label: 'Atherton House' },
     // residence halls: two storeys of dark vertical boards under low gables
-    { at: [1215, 150], w: 210, d: 34, phi: 2, h: 6.2, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.14, label: 'Perry-Fiske Hall' },
+    { at: [1215, 150], w: 210, d: 34, phi: 2, h: 6.2, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.14, label: 'Perry-Fiske Hall', dorm: 1 },
     { at: [1160, 112], w: 44, d: 34, phi: 2, h: 6.2, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.14 },
     { at: [1282, 112], w: 44, d: 34, phi: 2, h: 6.2, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.14 },
-    { at: [1415, 262], w: 200, d: 34, phi: 43, h: 6.2, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.14, label: 'Robertson Hall' },
-    { at: [1412, 436], w: 190, d: 40, phi: 37, h: 6.2, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.14, label: 'Carter Hall' },
+    { at: [1415, 262], w: 200, d: 34, phi: 43, h: 6.2, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.14, label: 'Robertson Hall', dorm: 1 },
+    { at: [1412, 436], w: 190, d: 40, phi: 37, h: 6.2, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.14, label: 'Carter Hall', dorm: 1, balc: 1 },
     // Saalfeld Energy Lab: steep shed roof on log columns over a concrete terrace
     { at: [1706, 136], w: 110, d: 82, phi: 0, h: 7.4, wall: 'wood', ends: 'stone', roof: 'shed', rise: -0.1, lanai: 1, eave: 4.6, logs: 1, deck: 'concrete', label: 'Saalfeld Energy Lab' }, // roof soars up over the terrace
     // athletics: Nakamaru Fitness, Castle Gymnasium (arched glulam roof with a monitor, lava-rock locker wing)
@@ -588,7 +590,7 @@ function createWorld(canvas) {
   const wallCache = {};
   function wallTex(kind) {
     if (wallCache[kind]) return wallCache[kind];
-    const H0 = kind === 'gym' ? 512 : kind === 'glass' ? 128 : 256;
+    const H0 = kind === 'gym' ? 512 : kind === 'glass' || kind === 'jal' ? 128 : 256;
     const t = canvasTex(512, H0, (g, W, H) => {
       const m = 64, Y = (y) => H - y * m, r = rng(kind.length * 97 + 5);
       const win = (x0, x1, y0, y1, frame, mull, top, bot) => {
@@ -641,6 +643,35 @@ function createWorld(canvas) {
         for (let x = 0; x < W; x += 64) { const gr = g.createLinearGradient(0, H * 0.08, 0, H * 0.21); gr.addColorStop(0, '#34485c'); gr.addColorStop(1, '#6a8094'); g.fillStyle = gr; g.fillRect(x + 6, H * 0.08, 52, H * 0.13); }
         g.fillStyle = '#9a9890'; g.fillRect(0, H * 0.9, W, H * 0.1);
         g.fillStyle = '#6d5a48'; g.fillRect(W * 0.4, H * 0.72, W * 0.2, H * 0.28);
+      } else if (kind === 'ribbon') {
+        // uphill side of the 1963 classrooms: painted redwood spandrel, a ribbon of fixed lights, hopper transoms
+        boards('#7a3f2c', 26);
+        g.fillStyle = '#2b2018'; g.fillRect(0, Y(3.05), W, (3.05 - 0.95) * m);
+        for (let x = 0; x < 8; x += 1.6) {
+          const gr = g.createLinearGradient(0, Y(2.5), 0, Y(1.0)); gr.addColorStop(0, '#26313b'); gr.addColorStop(1, '#5a6e80');
+          g.fillStyle = gr; g.fillRect((x + 0.06) * m, Y(2.48), 1.48 * m, 1.46 * m);
+          g.fillStyle = 'rgba(255,255,255,0.10)'; g.beginPath(); g.moveTo((x + 0.06) * m, Y(2.48)); g.lineTo((x + 0.6) * m, Y(2.48)); g.lineTo((x + 0.06) * m, Y(1.6)); g.fill();
+          g.fillStyle = '#3d4d5c'; g.fillRect((x + 0.06) * m, Y(3.0), 1.48 * m, 0.42 * m);
+        }
+      } else if (kind === 'lanai' || kind === 'lanaiL') {
+        // lanai side: flush wood doors, lockers (math and science), a transom band of solid-panel jalousies
+        boards('#4f3b2c', 12);
+        for (const dx of [1.0, 5.0]) { g.fillStyle = '#2b2018'; g.fillRect(dx * m - 5, Y(2.3) - 5, 1.0 * m + 10, 2.3 * m + 5); g.fillStyle = '#7a5636'; g.fillRect(dx * m, Y(2.3), 1.0 * m, 2.3 * m); g.fillStyle = '#c9b48a'; g.fillRect((dx + 0.82) * m, Y(1.05), 4, 10); }
+        if (kind === 'lanaiL') {
+          for (const x0 of [2.3, 6.3]) { g.fillStyle = '#5d6b5a'; g.fillRect(x0 * m, Y(1.95), 2.4 * m, 1.95 * m); for (let x = x0; x < x0 + 2.4; x += 0.3) { g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(x * m, Y(1.95), 2, 1.95 * m); g.fillStyle = 'rgba(255,255,255,0.25)'; g.fillRect((x + 0.05) * m, Y(1.7), 8, 3); g.fillRect((x + 0.05) * m, Y(1.62), 8, 3); } }
+        }
+        g.fillStyle = '#2b2018'; g.fillRect(0, Y(3.15), W, 0.75 * m);
+        for (let yy = 2.45; yy < 3.1; yy += 0.09) { g.fillStyle = '#6a5240'; g.fillRect(0, Y(yy + 0.07), W, 0.05 * m); }
+      } else if (kind === 'chapel') {
+        // board-formed concrete with embedded, hammer-struck lava rock
+        g.fillStyle = '#a19b91'; g.fillRect(0, 0, W, H);
+        for (let yy = 0; yy < H; yy += 9) { g.fillStyle = 'rgba(60,55,48,0.18)'; g.fillRect(0, yy, W, 2); for (let i = 0; i < 6; i++) { g.fillStyle = 'rgba(255,255,255,0.06)'; g.fillRect(r() * W, yy + 3, 30 + r() * 80, 3); } }
+        const pal = ['#6e6259', '#5f544c', '#7a6c60', '#665a50'];
+        for (let i = 0; i < 220; i++) { const x = r() * W, yy = r() * H, rad = 2.5 + r() * 5; g.fillStyle = pal[(r() * pal.length) | 0]; g.beginPath(); g.ellipse(x, yy, rad * 1.2, rad * 0.8, r() * 3, 0, 7); g.fill(); }
+      } else if (kind === 'jal') {
+        g.fillStyle = '#2b2018'; g.fillRect(0, 0, W, H);
+        for (let yy = 4; yy < H; yy += 14) { g.fillStyle = '#6b5240'; g.fillRect(0, yy, W, 9); g.fillStyle = 'rgba(255,230,190,0.12)'; g.fillRect(0, yy, W, 2); }
+        for (let x = 0; x < W; x += 128) { g.fillStyle = '#2b2018'; g.fillRect(x, 0, 6, H); }
       } else if (kind === 'white') {
         g.fillStyle = '#ebe8e0'; g.fillRect(0, 0, W, H);
         for (let i = 0; i < 3000; i++) { g.fillStyle = r() < 0.5 ? 'rgba(120,110,90,0.06)' : 'rgba(255,255,255,0.12)'; g.fillRect(r() * W, r() * H, 2, 2); }
@@ -681,12 +712,12 @@ function createWorld(canvas) {
 
   // walls with material groups: 0 = long walls, 1 = end walls (follow the roof line), 2 = clerestory band
   function wallsGeo(w, d, hF, hB, vSpan, gableRise) {
-    const hw = w / 2, hd = d / 2, G = [{ p: [], u: [] }, { p: [], u: [] }, { p: [], u: [] }];
+    const hw = w / 2, hd = d / 2, G = [{ p: [], u: [] }, { p: [], u: [] }, { p: [], u: [] }, { p: [], u: [] }];
     const quad = (gi, a, b, c, e, ua, ub, uc, ue) => { G[gi].p.push(...a, ...b, ...c, ...a, ...c, ...e); G[gi].u.push(...ua, ...ub, ...uc, ...ua, ...uc, ...ue); };
     const tri = (gi, a, b, c, ua, ub, uc) => { G[gi].p.push(...a, ...b, ...c); G[gi].u.push(...ua, ...ub, ...uc); };
     const vf = hF / vSpan, vb = hB / vSpan;
     quad(0, [-hw, 0, hd], [hw, 0, hd], [hw, hF, hd], [-hw, hF, hd], [0, 0], [w / 8, 0], [w / 8, vf], [0, vf]);
-    quad(0, [hw, 0, -hd], [-hw, 0, -hd], [-hw, hF, -hd], [hw, hF, -hd], [0, 0], [w / 8, 0], [w / 8, vf], [0, vf]);
+    quad(3, [hw, 0, -hd], [-hw, 0, -hd], [-hw, hF, -hd], [hw, hF, -hd], [0, 0], [w / 8, 0], [w / 8, vf], [0, vf]);
     quad(1, [hw, 0, hd], [hw, 0, -hd], [hw, hB, -hd], [hw, hF, hd], [0, 0], [d / 8, 0], [d / 8, vb], [0, vf]);
     quad(1, [-hw, 0, -hd], [-hw, 0, hd], [-hw, hF, hd], [-hw, hB, -hd], [0, 0], [d / 8, 0], [d / 8, vf], [0, vb]);
     if (gableRise) {
@@ -711,8 +742,8 @@ function createWorld(canvas) {
     return geo;
   }
   // roof: metal top plus dark trim (fascia, soffit, exposed rafters). y = 0 is the low wall plate.
-  function roofParts(type, w, d, rise, eave, rafters) {
-    const hw = w / 2, hd = d / 2, W = hw + eave, D = hd + eave, f = type === 'shed' ? 0.45 : 0.35;
+  function roofParts(type, w, d, rise, eave, rafters, eaveEnd) {
+    const hw = w / 2, hd = d / 2, W = hw + (eaveEnd || eave), D = hd + eave, f = type === 'shed' ? 0.45 : 0.35;
     const top = [], trim = [];
     const quad = (arr, a, b, c, e) => arr.push(a, b, c, a, c, e);
     let yF = 0, yB = 0, k = 0;
@@ -781,7 +812,7 @@ function createWorld(canvas) {
     const g = new THREE.Group();
     const y0 = groundH(b.x, b.z);
     g.position.set(b.x, y0, b.z); g.rotation.y = b.rot;
-    const woodish = b.wall === 'wood' || b.wall === 'stone';
+    const woodish = b.wall === 'wood' || b.wall === 'stone' || b.wall === 'open';
     const floor = woodish && b.h < 5 ? 0.6 : 0.15;
     const eave = b.eave || (b.roof === 'shed' ? 2.6 : b.roof === 'arch' ? 1.5 : b.wall === 'gym' ? 0.9 : woodish ? 1.9 : 1.2);
     const hd = b.d / 2, D = hd + eave;
@@ -792,11 +823,21 @@ function createWorld(canvas) {
     else if (b.roof === 'arch') { rise = b.d * (b.rise || 0.12); gableRise = rise * 0.85; }
     const body = new THREE.Group(); body.position.y = floor; g.add(body);
     const vSpan = b.wall === 'gym' ? b.h : 4;
-    const walls = new THREE.Mesh(wallsGeo(b.w, b.d, hF, hB, vSpan, gableRise), [wallMat(b.wall), wallMat(b.ends || b.wall), wallMat('glass')]);
-    walls.castShadow = true; walls.receiveShadow = true; body.add(walls);
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(b.w + 0.3, 3 + floor, b.d + 0.3), footMat); foot.position.y = (floor - 3) / 2; foot.receiveShadow = true; g.add(foot);
+    if (!b.open) {
+      const front = b.cls ? (b.lockers ? 'lanaiL' : 'lanai') : b.wall, back = b.cls ? 'ribbon' : b.wall;
+      const walls = new THREE.Mesh(wallsGeo(b.w, b.d, hF, hB, vSpan, gableRise), [wallMat(front), wallMat(b.ends || b.wall), wallMat('glass'), wallMat(back)]);
+      walls.castShadow = true; walls.receiveShadow = true; body.add(walls);
+      const foot = new THREE.Mesh(new THREE.BoxGeometry(b.w + 0.3, 3 + floor, b.d + 0.3), b.dorm || b.name === 'chapel' ? wallMat('stone') : footMat); foot.position.y = (floor - 3) / 2; foot.receiveShadow = true; g.add(foot);
+    } else {
+      // open pavilion: log posts round a concrete slab, wood lockers along the back
+      const slab = new THREE.Mesh(new THREE.BoxGeometry(b.w, 0.2, b.d), concreteMat); slab.position.y = floor - 0.1; slab.receiveShadow = true; g.add(slab);
+      const parts = [], under = (z) => hF + (b.roof === 'shed' ? (-(rise / b.d) * (z - b.d / 2)) : 0) - 0.4;
+      for (let x = -b.w / 2; x <= b.w / 2 + 0.01; x += b.w / Math.round(b.w / 3.5)) for (const z of [-b.d / 2, b.d / 2]) { const h2 = under(z); parts.push({ g: new THREE.CylinderGeometry(0.16, 0.2, h2, 8).translate(x, floor + h2 / 2, z), c: C('#a39a8c') }); }
+      for (let x = -b.w / 2 + 1; x < b.w / 2 - 1; x += 0.45) parts.push({ g: new THREE.BoxGeometry(0.42, 1.8, 0.45).translate(x, floor + 0.9, -b.d / 2 + 0.5), c: C('#7a5636') });
+      const pm = new THREE.Mesh(mergeGeoms(parts), trimMat); pm.castShadow = true; pm.receiveShadow = true; body.add(pm);
+    }
     const roofColor = b.roofColor || (b.wall === 'gym' ? '#d9d9d5' : '#a9a9a4');
-    const rp = b.roof === 'arch' ? archRoof(b.w, b.d, rise, eave) : roofParts(b.roof, b.w, b.d, rise, eave, woodish && b.roof !== 'flat');
+    const rp = b.roof === 'arch' ? archRoof(b.w, b.d, rise, eave) : roofParts(b.roof, b.w, b.d, rise, eave, (woodish || b.name === 'chapel') && b.roof !== 'flat', b.eaveEnd);
     const top = new THREE.Mesh(rp.top, roofMat(roofColor)); top.position.y = hF; top.castShadow = true; top.receiveShadow = true; body.add(top);
     const trim = new THREE.Mesh(rp.trim, trimMat); trim.position.y = hF; trim.castShadow = true; trim.receiveShadow = true; body.add(trim);
     if (rp.monitor) { const mo = rp.monitor; const glassBand = new THREE.Mesh(new THREE.BoxGeometry(mo.w, mo.h, mo.d), wallMat('glass')); glassBand.position.y = hF + mo.y + mo.h / 2; glassBand.castShadow = true; body.add(glassBand); }
@@ -819,7 +860,8 @@ function createWorld(canvas) {
       const deck = new THREE.Mesh(new THREE.BoxGeometry(b.w + 0.6, 0.18, deckDepth), b.deck === 'concrete' ? concreteMat : deckMat);
       deck.position.set(0, floor - 0.09, hd + deckDepth / 2); deck.receiveShadow = true; deck.castShadow = true; g.add(deck);
       const parts = [], dark = C(WOOD_DARK), mid = C('#4a382a');
-      parts.push({ g: new THREE.BoxGeometry(b.w + 0.6, floor + 3, 0.12).translate(0, (floor - 3) / 2, hd + deckDepth), c: C('#2f2620') });
+      if (b.cls) { for (let x = -b.w / 2 - 0.2; x <= b.w / 2 + 0.3; x += 1.6) parts.push({ g: new THREE.BoxGeometry(0.16, floor + 2, 0.16).translate(x, (floor - 2) / 2, hd + deckDepth - 0.1), c: C('#2f2620') }); }
+      else parts.push({ g: new THREE.BoxGeometry(b.w + 0.6, floor + 3, 0.12).translate(0, (floor - 3) / 2, hd + deckDepth), c: C('#2f2620') });
       const zp = hd + deckDepth - 0.12;
       const underAt = (z) => (b.roof === 'shed' ? -rp.k * (z - hd) : 0) - rp.f;
       const postH = hF + underAt(zp);
@@ -830,29 +872,96 @@ function createWorld(canvas) {
         for (const hh of [0.95, 0.5]) parts.push({ g: new THREE.BoxGeometry(x1 - x0, 0.08, 0.08).translate((x0 + x1) / 2, floor + hh, zp + 0.05), c: mid });
         for (let x = x0; x <= x1; x += 1.6) parts.push({ g: new THREE.BoxGeometry(0.08, 0.95, 0.08).translate(x, floor + 0.475, zp + 0.05), c: mid });
       };
-      rail(-b.w / 2 - 0.3, -1.2); rail(1.2, b.w / 2 + 0.3);
-      for (let i = 0; i < 3; i++) parts.push({ g: new THREE.BoxGeometry(2.2, floor * (3 - i) / 3, 0.35).translate(0, floor * (3 - i) / 6, hd + deckDepth + 0.17 + i * 0.35), c: C('#5c4635') });
+      if (b.cls) {
+        rail(-b.w / 2 - 0.3, b.w / 2 + 0.3);
+        for (const sx of [-1, 1]) { const L = 3.4, ramp = new THREE.BoxGeometry(L, 0.14, deckDepth - 0.2); ramp.rotateZ(sx * Math.atan2(floor, L)); ramp.translate(sx * (b.w / 2 + 0.3 + L / 2), floor / 2 - 0.05, hd + deckDepth / 2); parts.push({ g: ramp, c: C('#8a8378') }); }
+      } else rail(-b.w / 2 - 0.3, -1.2), rail(1.2, b.w / 2 + 0.3);
+      if (!b.cls) for (let i = 0; i < 3; i++) parts.push({ g: new THREE.BoxGeometry(2.2, floor * (3 - i) / 3, 0.35).translate(0, floor * (3 - i) / 6, hd + deckDepth + 0.17 + i * 0.35), c: C('#5c4635') });
       const m = new THREE.Mesh(mergeGeoms(parts), trimMat); m.castShadow = true; m.receiveShadow = true; g.add(m);
     }
+    const ohia = C('#a39a8c');
+    if (b.cls) {
+      // polycarbonate windscreen hanging from the high uphill eave, and a translucent strip in the roof over the lanai
+      const poly = new THREE.MeshStandardMaterial({ color: C('#e4ecee'), transparent: true, opacity: 0.55, roughness: 0.3, side: THREE.DoubleSide, depthWrite: false });
+      const ws = new THREE.Mesh(new THREE.PlaneGeometry(b.w + 2 * eave, 0.95), poly); ws.position.set(0, hF + rp.yB - 0.45 - 0.48, -D - 0.02); body.add(ws);
+      const zs = hd + 0.7, strip = new THREE.Mesh(new THREE.BoxGeometry(b.w + 2 * eave - 0.4, 0.03, 1.0), poly);
+      strip.rotation.x = Math.atan(rp.k); strip.position.set(0, hF - rp.k * (zs - hd) + 0.03, zs); body.add(strip);
+    }
+    if (b.logEnds) {
+      // natural ohia log posts under the deep gable-end eaves
+      const parts = [];
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.push({ g: new THREE.CylinderGeometry(0.16, 0.2, hF - 0.35, 9).translate(sx * (b.w / 2 + b.eaveEnd - 0.35), floor + (hF - 0.35) / 2, sz * (hd - 0.35)), c: ohia });
+      const lm = new THREE.Mesh(mergeGeoms(parts), trimMat); lm.castShadow = true; g.add(lm);
+    }
+    if (b.dorm) {
+      // three-sided cantilevered common-room bay at the centre of the downhill front, upper floor
+      const sh = new THREE.Shape(); sh.moveTo(-4.2, 0); sh.lineTo(4.2, 0); sh.lineTo(2.6, -2.6); sh.lineTo(-2.6, -2.6); sh.closePath();
+      const bay = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 2.9, bevelEnabled: false }).rotateX(-Math.PI / 2), [wallMat('wood'), wallMat('glass')]);
+      bay.position.set(1.5, floor + 3.3, hd); bay.castShadow = true; g.add(bay);
+      const bayRoof = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.25, bevelEnabled: false }).rotateX(-Math.PI / 2), roofMat('#a9a9a4'));
+      bayRoof.scale.set(1.12, 1, 1.12); bayRoof.position.set(1.5, floor + 6.2, hd); bayRoof.castShadow = true; g.add(bayRoof);
+      // full-height lava rubble sections on the front
+      for (const x of [-b.w * 0.3, b.w * 0.3, -b.w * 0.05]) { const st = new THREE.Mesh(new THREE.BoxGeometry(3.4, hF + floor, 0.35), wallMat('stone')); st.position.set(x, (hF + floor) / 2, hd + 0.12); st.castShadow = true; st.receiveShadow = true; g.add(st); }
+      // open entry lanai beside the bay
+      const ent = new THREE.Mesh(new THREE.BoxGeometry(5, 0.15, 2.4), concreteMat); ent.position.set(-4.2, floor + 0.05, hd + 1.2); ent.receiveShadow = true; g.add(ent);
+      if (b.balc) {
+        // Carter Hall: upper balconies at the two front corners
+        const parts = [];
+        for (const sx of [-1, 1]) {
+          const x = sx * (b.w / 2 - 3);
+          parts.push({ g: new THREE.BoxGeometry(5, 0.18, 1.8).translate(x, floor + 3.1, hd + 0.9), c: C('#5c4635') });
+          parts.push({ g: new THREE.BoxGeometry(5, 0.08, 0.08).translate(x, floor + 4.05, hd + 1.75), c: C('#4a382a') });
+          for (let dx = -2.5; dx <= 2.51; dx += 0.5) parts.push({ g: new THREE.BoxGeometry(0.06, 0.95, 0.06).translate(x + dx, floor + 3.6, hd + 1.75), c: C('#4a382a') });
+        }
+        const bm = new THREE.Mesh(mergeGeoms(parts), trimMat); bm.castShadow = true; g.add(bm);
+      }
+    }
+    if (b.name === 'wishard') {
+      // screen walls of narrow, widely spaced vertical boards and log posts at the north entry, lava garden walls
+      const parts = [];
+      const proj = new THREE.Mesh(new THREE.BoxGeometry(10, hF, 3.2), [wallMat('wood'), wallMat('wood'), wallMat('wood'), wallMat('wood'), wallMat('wood'), wallMat('glass')]);
+      proj.rotation.y = Math.PI; proj.position.set(0, floor + hF / 2, -hd - 1.6); proj.castShadow = true; g.add(proj);
+      { const [qx, qz] = toWorld(b, 0, -hd - 1.6); box(qx, qz, 5.2, 1.7, b.rot); }
+      const projRoof = new THREE.Mesh(new THREE.BoxGeometry(11.2, 0.2, 4.4), roofMat('#a9a9a4')); projRoof.position.set(0, floor + hF + 0.1, -hd - 2.0); projRoof.castShadow = true; g.add(projRoof);
+      for (const cx of [-8.6, 8.6]) for (let x = cx - 1.6; x <= cx + 1.6; x += 0.28) parts.push({ g: new THREE.BoxGeometry(0.09, 2.6, 0.16).translate(x, floor + 1.3, -hd - 1.6), c: C('#4a382a') });
+      for (const x of [-6, 6, -13, 13]) parts.push({ g: new THREE.CylinderGeometry(0.17, 0.21, hF, 9).translate(x, floor + hF / 2, -hd - 2.4), c: ohia });
+      const sm = new THREE.Mesh(mergeGeoms(parts), trimMat); sm.castShadow = true; g.add(sm);
+      for (const x of [-16, 16]) { const [wx, wz] = toWorld(b, x, -hd - 5); const lw = new THREE.Mesh(new THREE.BoxGeometry(6, 1.1, 0.45), wallMat('stone')); lw.position.set(x, groundH(wx, wz) - y0 + 0.4, -hd - 5); lw.castShadow = true; g.add(lw); box(wx, wz, 3.1, 0.3, b.rot); }
+    }
     if (b.name === 'chapel') {
-      // open timber bell frame standing at the entry end
-      const st = new THREE.Group(); st.position.set(b.w / 2 + 1.6, 0, 0); g.add(st);
-      const parts = [], dk = C(WOOD_DARK), top = floor + b.h + gableRise + 1.6;
-      for (const [x, z] of [[-0.9, -1.1], [0.9, -1.1], [-0.9, 1.1], [0.9, 1.1]]) parts.push({ g: new THREE.BoxGeometry(0.36, top, 0.36).translate(x, top / 2, z), c: dk });
-      for (const y of [top * 0.45, top * 0.8]) { parts.push({ g: new THREE.BoxGeometry(2.1, 0.22, 0.22).translate(0, y, -1.1), c: dk }); parts.push({ g: new THREE.BoxGeometry(2.1, 0.22, 0.22).translate(0, y, 1.1), c: dk }); parts.push({ g: new THREE.BoxGeometry(0.22, 0.22, 2.5).translate(-0.9, y, 0), c: dk }); parts.push({ g: new THREE.BoxGeometry(0.22, 0.22, 2.5).translate(0.9, y, 0), c: dk }); }
-      const fm = new THREE.Mesh(mergeGeoms(parts), trimMat); fm.castShadow = true; st.add(fm);
-      const cap = new THREE.Mesh(roofParts('gable', 2.2, 2.6, 1.1, 0.4).top, roofMat('#b9b8b2')); cap.position.y = top; cap.castShadow = true; st.add(cap);
-      const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.38, 0.55, 14), new THREE.MeshStandardMaterial({ color: C('#9a7b3c'), metalness: 0.8, roughness: 0.35 }));
-      bell.position.y = top * 0.8 - 0.45; st.add(bell);
-      const cr = new THREE.MeshStandardMaterial({ color: C('#efe9dc'), roughness: 0.6 });
-      const c1 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.0, 0.1), cr); c1.position.y = top + 1.6; st.add(c1);
-      const c2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.6), cr); c2.position.y = top + 1.8; st.add(c2);
+      // south (front) facade: colored multi-light window behind a screen of ohia posts, big ohia posts at the entries
+      const glassTex = canvasTex(512, 192, (c, W2, H2) => {
+        c.fillStyle = '#2b2018'; c.fillRect(0, 0, W2, H2);
+        const cols = ['#c8433a', '#e0a33a', '#3d78b8', '#5aa35a', '#9a5bb0', '#e6d38a'], r = rng(7);
+        for (let x = 0; x < W2; x += 32) for (let y = 0; y < H2; y += 32) { c.fillStyle = cols[(r() * cols.length) | 0]; c.globalAlpha = 0.85; c.fillRect(x + 3, y + 3, 26, 26); }
+        c.globalAlpha = 1; c.strokeStyle = '#f2ead6'; c.lineWidth = 6;
+        c.beginPath(); c.moveTo(W2 / 2, 30); c.lineTo(W2 / 2, 165); c.moveTo(W2 / 2 - 40, 75); c.lineTo(W2 / 2 + 40, 75); c.stroke();
+        c.beginPath(); c.arc(W2 * 0.22, 96, 34, 0, Math.PI * 2); c.stroke(); c.beginPath(); c.arc(W2 * 0.78, 96, 26, 0, Math.PI * 2); c.stroke();
+      });
+      const win = new THREE.Mesh(new THREE.PlaneGeometry(8, 3), new THREE.MeshStandardMaterial({ map: glassTex, emissive: C('#3a2a1a'), roughness: 0.3 }));
+      win.position.set(-2, floor + 2.1, hd + 0.03); g.add(win);
+      const parts = [];
+      for (let x = -6.2; x <= 2.2; x += 0.34) parts.push({ g: new THREE.CylinderGeometry(0.075, 0.085, 3.6, 7).translate(x, floor + 1.9, hd + 0.55), c: ohia });
+      for (const x of [b.w / 2 - 6, b.w / 2 - 3]) parts.push({ g: new THREE.CylinderGeometry(0.28, 0.32, hF + 0.2, 10).translate(x, floor + (hF + 0.2) / 2, hd + 0.4), c: ohia });
+      // pent roof over the side aisle and entry along the south facade, on ohia posts
+      for (let x = -b.w / 2 + 0.5; x <= b.w / 2 - 0.4; x += 3.4) parts.push({ g: new THREE.CylinderGeometry(0.14, 0.17, 2.6, 8).translate(x, floor + 1.3, hd + 3.1), c: ohia });
+      // heavy timber beam ends along both eaves
+      for (let x = -b.w / 2 + 1; x <= b.w / 2 - 0.8; x += 2.8) for (const sz of [-1, 1]) parts.push({ g: new THREE.BoxGeometry(0.32, 0.5, eave + 0.3).translate(x, floor + hF - 0.25, sz * (hd + (eave + 0.3) / 2)), c: C('#5b4433') });
+      // covered walkway (pent roof on an ohia colonnade) running from the west end toward the driveway
+      for (let x = -b.w / 2 - 14; x <= -b.w / 2; x += 3) parts.push({ g: new THREE.CylinderGeometry(0.13, 0.16, 2.6, 8).translate(x, 1.3, hd + 1.6), c: ohia });
+      const pm = new THREE.Mesh(mergeGeoms(parts), trimMat); pm.castShadow = true; pm.receiveShadow = true; g.add(pm);
+      const pent = new THREE.Mesh(new THREE.BoxGeometry(b.w, 0.16, 3.6), roofMat('#b9b8b2')); pent.position.set(0, floor + 2.75, hd + 1.8); pent.rotation.x = 0.12; pent.castShadow = true; g.add(pent);
+      const walk = new THREE.Mesh(new THREE.BoxGeometry(14.5, 0.14, 2.6), roofMat('#b9b8b2')); walk.position.set(-b.w / 2 - 7, 2.7, hd + 1.0); walk.rotation.x = 0.1; walk.castShadow = true; g.add(walk);
+      const walkFloor = new THREE.Mesh(new THREE.BoxGeometry(14.5, 0.1, 2.4), concreteMat); walkFloor.position.set(-b.w / 2 - 7, 0.05, hd + 1.0); walkFloor.receiveShadow = true; g.add(walkFloor);
+      // wood jalousie bands across the upper level, north and south
+      for (const sz of [-1, 1]) { const jb = new THREE.Mesh(new THREE.PlaneGeometry(b.w - 1, 1.1), wallMat('jal')); jb.position.set(0, floor + hF - 0.8, sz * (hd + 0.03)); if (sz < 0) jb.rotation.y = Math.PI; g.add(jb); }
+      const [px, pz] = toWorld(b, 0, hd + 3.1); box(px, pz, b.w / 2, 0.25, b.rot);
     }
     if (b.name === 'gpac') {
       // tall stage house behind the hall and a deep entry canopy on posts, as in the drone footage
       const fly = new THREE.Group(); fly.position.set(b.w * 0.18, 0, -b.d * 0.12); g.add(fly);
       const fw = b.w * 0.42, fd = b.d * 0.5, fh = b.h + 6;
-      const fwalls = new THREE.Mesh(wallsGeo(fw, fd, fh, fh, fh, fd * 0.3 * 0.5), [wallMat('gym'), wallMat('gym'), wallMat('glass')]); fwalls.castShadow = true; fly.add(fwalls);
+      const fwalls = new THREE.Mesh(wallsGeo(fw, fd, fh, fh, fh, fd * 0.3 * 0.5), [wallMat('gym'), wallMat('gym'), wallMat('glass'), wallMat('gym')]); fwalls.castShadow = true; fly.add(fwalls);
       const fr = roofParts('gable', fw, fd, fd * 0.3, 0.8); const ft = new THREE.Mesh(fr.top, roofMat('#efefec')); ft.position.y = fh; ft.castShadow = true; fly.add(ft);
       const ftr = new THREE.Mesh(fr.trim, trimMat); ftr.position.y = fh; fly.add(ftr);
       const can = new THREE.Group(); can.position.set(-b.w * 0.1, 0, b.d / 2); g.add(can);
@@ -871,7 +980,7 @@ function createWorld(canvas) {
     }
     scene.add(g);
     const [cx, cz] = toWorld(b, 0, deckDepth / 2);
-    box(cx, cz, b.w / 2 + 0.35, b.d / 2 + deckDepth / 2 + 0.35, b.rot);
+    if (!b.open) box(cx, cz, b.w / 2 + 0.35, b.d / 2 + deckDepth / 2 + 0.35, b.rot);
     return g;
   }
   BUILDINGS.forEach(building);
