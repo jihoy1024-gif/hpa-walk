@@ -260,8 +260,8 @@ const floralTex = (() => {
 // (where the legs part, where the arms leave the body, how low the hands hang), as fractions of its height [x, y];
 // every vertex is then tied to the hips, a leg or an arm, so the same poses as the hand-built avatars move them.
 const MODELS = {
-  m: { url: 'models/jiho.glb', H: 1.75, joints: { hip: [0.075, 0.3], sh: [0.12, 0.56], hand: [0.2, 0.34] } },
-  f: { url: 'models/isa.glb', H: 1.62, joints: { hip: [0.06, 0.27], sh: [0.13, 0.54], hand: [0.205, 0.36] } },
+  m: { url: 'models/jiho.glb', v: 1, H: 1.75, joints: { hip: [0.075, 0.3], sh: [0.12, 0.56], hand: [0.2, 0.34] } },
+  f: { url: 'models/isa.glb', v: 2, H: 1.62, joints: { hip: [0.06, 0.27], sh: [0.13, 0.54], hand: [0.205, 0.36] } },
 };
 function prepareModel(kind, gltf) {
   const M = MODELS[kind];
@@ -284,7 +284,7 @@ function prepareModel(kind, gltf) {
     const onArm = ax > px - 0.035 * H && Math.hypot(ax - px, y - py) < 0.065 * H && y < sh.y + 0.05 * H && y > hand.y - 0.08 * H;
     let bone = 0, w = 0;
     if (onArm) { bone = L ? 3 : 4; w = Math.min(1, t * 3.5); }
-    else if (y < hip.y + 0.03 * H && ax < 0.15 * H) { bone = L ? 1 : 2; w = Math.min(1, Math.max(0, (hip.y + 0.03 * H - y) / (0.07 * H))); }
+    else if (y < hip.y + 0.03 * H && (ax < 0.15 * H || y < hand.y - 0.08 * H)) { bone = L ? 1 : 2; w = Math.min(1, Math.max(0, (hip.y + 0.03 * H - y) / (0.07 * H))); }
     si[i * 4] = bone; sw[i * 4] = w; si[i * 4 + 1] = 0; sw[i * 4 + 1] = 1 - w;
   }
   geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
@@ -304,9 +304,9 @@ function makeModelAvatar(kind, leiColor) {
   mesh.add(root); mesh.updateMatrixWorld(true); mesh.bind(new THREE.Skeleton([root, legL, legR, armL, armR]));
   mesh.castShadow = true; mesh.frustumCulled = false; p.add(mesh);
   // a lei in the chosen colour, round the neck just above the shoulders
-  const lei = new THREE.MeshStandardMaterial({ color: C(leiColor), roughness: 0.8 }), ny = r.sh.y / H + 0.08;
-  const curve = new THREE.CatmullRomCurve3([[-0.075, ny + 0.03, 0.02], [-0.075, ny - 0.005, 0.07], [0, ny - 0.035, 0.11], [0.075, ny - 0.005, 0.07], [0.075, ny + 0.03, 0.02], [0, ny + 0.04, -0.07]].map(([x, y, z]) => new THREE.Vector3(x * H, y * H, z * H)), true);
-  const leiMesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.022, 6, true), lei); leiMesh.castShadow = true; p.add(leiMesh);
+  const lei = new THREE.MeshStandardMaterial({ color: C(leiColor), roughness: 0.75, vertexColors: true }), ny = r.sh.y / H + 0.08;
+  const curve = new THREE.CatmullRomCurve3([[-0.08, ny + 0.03, 0.02], [-0.08, ny - 0.01, 0.075], [0, ny - 0.045, 0.115], [0.08, ny - 0.01, 0.075], [0.08, ny + 0.03, 0.02], [0, ny + 0.045, -0.075]].map(([x, y, z]) => new THREE.Vector3(x * H, y * H, z * H)), true);
+  const leiMesh = new THREE.Mesh(leiGeo(curve), lei); leiMesh.castShadow = true; p.add(leiMesh);
   const racket = new THREE.Group(); racket.position.set(0, -r.armLen, 0.03); racket.visible = false; armR.add(racket);
   add3(racket, new THREE.CylinderGeometry(0.016, 0.016, 0.3, 8), new THREE.MeshStandardMaterial({ color: 0x222226, roughness: 0.5 }), 0, -0.12, 0);
   const rh = add3(racket, new THREE.TorusGeometry(0.13, 0.013, 6, 24), new THREE.MeshStandardMaterial({ color: 0x2f6fd0, roughness: 0.4 }), 0, -0.4, 0); rh.scale.y = 1.25;
@@ -314,6 +314,24 @@ function makeModelAvatar(kind, leiColor) {
   shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.08; g.add(shadow);
   scene.add(g);
   return { g, p, lei, legL, legR, armL, armR, skirt: null, racket, phase: 0, t: Math.random() * 10, kickUntil: 0, swingUntil: 0, gender: kind, hipAdj: 0.7 - r.hip.y, model: true };
+}
+// a lei of overlapping petals, shaded a little so the ruff reads; the material colour tints it
+function leiGeo(curve) {
+  const pos = [], nor = [], col = [], up = new THREE.Vector3(0, 1, 0), side = new THREE.Vector3(), nrm = new THREE.Vector3(), off = new THREE.Vector3(), N = 56;
+  for (let i = 0; i < N; i++) {
+    const t = i / N, pt = curve.getPointAt(t), tg = curve.getTangentAt(t);
+    side.crossVectors(tg, up).normalize(); nrm.crossVectors(side, tg).normalize();
+    for (let k = 0; k < 4; k++) {
+      const a = k / 4 * Math.PI * 2 + i * 0.7, shade = k % 2 ? 0.82 : 1, centre = k === 0 && i % 3 === 0;
+      off.copy(side).multiplyScalar(Math.cos(a) * 0.02).addScaledVector(nrm, Math.sin(a) * 0.02);
+      const g = new THREE.IcosahedronGeometry(centre ? 0.012 : 0.019, 0); g.scale(1, 1, 0.5); g.lookAt(off); g.translate(pt.x + off.x, pt.y + off.y, pt.z + off.z);
+      pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array);
+      for (let v = 0; v < g.attributes.position.count; v++) centre ? col.push(1, 0.93, 0.55) : col.push(shade, shade, shade);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return geo;
 }
 function add3(parent, geo, mat, x, y, z) { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); parent.add(m); return m; }
 function makeAvatar(leiColor, skinIdx, gender) {
@@ -1440,7 +1458,7 @@ renderPeers();
 // Jiho's and Isa's models load in the background; until then they show as the hand-built avatars. Each GLB ships as
 // base64 text (the artifact host doesn't serve .glb) and is decoded here before parsing.
 if (THREE.GLTFLoader) for (const kind of ['m', 'f']) {
-  fetch(MODELS[kind].url + '.txt').then((res) => (res.ok ? res.text() : Promise.reject(res.status))).then((b64) => {
+  fetch(MODELS[kind].url + '.txt?v=' + MODELS[kind].v).then((res) => (res.ok ? res.text() : Promise.reject(res.status))).then((b64) => {
     const bin = atob(b64.trim()), buf = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
     new THREE.GLTFLoader().parse(buf.buffer, '', (gltf) => {
