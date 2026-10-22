@@ -8,7 +8,7 @@
 (function () {
 'use strict';
 
-function createWorld(canvas) {
+function createWorld(canvas, mapData) {
   const rng = (seed) => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
   const R = rng(1949); // HPA's founding year
   const smooth = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -64,6 +64,52 @@ function createWorld(canvas) {
   const toLocal = (o, x, z) => { const c = Math.cos(o.rot), s = Math.sin(o.rot), dx = x - o.x, dz = z - o.z; return [dx * c - dz * s, dx * s + dz * c]; };
   const toWorld = (o, lx, lz) => { const c = Math.cos(o.rot), s = Math.sin(o.rot); return [o.x + lx * c + lz * s, o.z - lx * s + lz * c]; };
 
+  // ---------- real map data (data/: USGS lidar terrain, OpenStreetMap footprints) ----------
+  // The campus was first laid out on the school's map image (P above). Fitted against the real map
+  // (tools/fit_old_frame.py) that layout is 1.4 % small, turned 0.45° and about 4 m off, so the game keeps its frame
+  // and reads the real data through the fit: realXZ() turns a game position into the data's frame (metres, x east,
+  // z south, the track infield at 0), gameXZ() the other way. Without data/ the hand-made terrain is used.
+  const MAP = mapData || null, T = MAP && MAP.terrain;
+  const FIT = MAP && MAP.fit ? MAP.fit : { scale: 1, rotation_deg: 0, shift: [0, 0] };
+  const fitC = Math.cos(FIT.rotation_deg * RAD) * FIT.scale, fitS = Math.sin(FIT.rotation_deg * RAD) * FIT.scale;
+  const realXZ = (x, z) => [fitC * x - fitS * z + FIT.shift[0], fitS * x + fitC * z + FIT.shift[1]];
+  const gameXZ = (X, Z) => { const dx = X - FIT.shift[0], dz = Z - FIT.shift[1], k = 1 / (FIT.scale * FIT.scale); return [(fitC * dx + fitS * dz) * k, (-fitS * dx + fitC * dz) * k]; };
+  // bilinear on the 1 m lidar grid, in the data's frame
+  function lidarH(X, Z) {
+    const fx = Math.min(T.nx - 1.001, Math.max(0, X - T.x0 - 0.5)), fz = Math.min(T.nz - 1.001, Math.max(0, Z - T.z0 - 0.5));
+    const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j, a = T.h, n = T.nx, k = j * n + i;
+    return T.hmin + T.scale * ((a[k] * (1 - u) + a[k + 1] * u) * (1 - v) + (a[k + n] * (1 - u) + a[k + n + 1] * u) * v);
+  }
+  // a footprint (data frame) as the game's centre, size and turn of its tightest rectangle, long side along local x
+  function footprintBox(ring) {
+    const pts = ring.map(([X, Z]) => gameXZ(X, Z));
+    let best = null;
+    for (let i = 0; i < pts.length; i++) {
+      const [ax, az] = pts[i], [bx, bz] = pts[(i + 1) % pts.length], a = Math.atan2(bz - az, bx - ax), c = Math.cos(a), s2 = Math.sin(a);
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (const [x, z] of pts) { const u = x * c + z * s2, v = -x * s2 + z * c; x0 = Math.min(x0, u); x1 = Math.max(x1, u); z0 = Math.min(z0, v); z1 = Math.max(z1, v); }
+      const area = (x1 - x0) * (z1 - z0);
+      if (!best || area < best.area) best = { area, a, u: (x0 + x1) / 2, v: (z0 + z1) / 2, w: x1 - x0, d: z1 - z0 };
+    }
+    let { a, w, d } = best;
+    if (d > w) { const t2 = w; w = d; d = t2; a += Math.PI / 2; }
+    const c = Math.cos(best.a), s2 = Math.sin(best.a);
+    return { x: best.u * c - best.v * s2, z: best.u * s2 + best.v * c, w, d, rot: -a, area: best.area };
+  }
+  const ringCentre = (ring) => { let A = 0, cx = 0, cz = 0; for (let i = 0; i < ring.length; i++) { const [x0, z0] = ring[i], [x1, z1] = ring[(i + 1) % ring.length], c = x0 * z1 - x1 * z0; A += c; cx += (x0 + x1) * c; cz += (z0 + z1) * c; } return gameXZ(cx / (3 * A), cz / (3 * A)); };
+  const osmById = new Map(MAP ? MAP.buildings.map((o) => [o.id, o]) : []);
+  // the shift that puts a hand-made piece centred at (x, z) on the centre of footprint `id`; none without data
+  function shiftTo(id, x, z) {
+    const o = osmById.get(id); if (!o) return [0, 0];
+    const [cx, cz] = ringCentre(o.ring); return [cx - x, cz - z];
+  }
+  // OpenStreetMap footprints the hand-made pieces below are matched to (checked with tools/compare_area.py and the
+  // school's official campus map): the library is one T-shaped outline, the gym block another
+  const FP = { library: 'osm205019819', gym: 'osm385651123', tennis: 'osm385651122', pool: 'osm287157214' };
+  // Dyer Library, its east wing, south deck, ramps and stair move together (centre of the two blocks in the
+  // hand-made layout: 180.7, -109.4)
+  const [LIB_DX, LIB_DZ] = shiftTo(FP.library, 180.7, -109.4);
+
   // ---------- campus data (image pixels) ----------
   // track: oval centred at the origin, long axis running NNW–SSE
   const TRACK = { x: 0, z: 0, rot: -56 * RAD };
@@ -84,7 +130,7 @@ function createWorld(canvas) {
     { at: [651, 437], w: 90, d: 42, phi: 22, h: 3.2, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1, cls: 1, name: 'ml', label: 'Modern Language Building' },
     { at: [742, 412], w: 70, d: 38, phi: 30, h: 3.1, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1, cls: 1, lockers: 1 },
     { at: [776, 487], w: 115, d: 40, phi: 46, h: 3.1, wall: 'wood', ends: 'stone', roof: 'shed', lanai: 1, cls: 1, lockers: 1, label: 'Atherton Science Building' },
-    { at: [884, 437], w: 96, d: 54, phi: 20, h: 3.3, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.2, eave: 2.2, lanai: 1, name: 'wishard', label: 'Wishard Administration' },
+    { at: [884, 437], w: 96, d: 54, phi: 20, h: 3.3, wall: 'wood', ends: 'stone', roof: 'gable', rise: 0.2, eave: 2.2, lanai: 1, name: 'wishard', label: 'Wishard Administration Building' },
     { at: [941, 486], w: 52, d: 22, phi: 20, h: 3.0, wall: 'open', roof: 'shed', rise: 0.12, eave: 0.6, open: 1 }, // Becky Carter Student Pavilion
     { at: [915, 572], w: 96, d: 32, phi: 22, h: 3.2, wall: 'wood', ends: 'stone', roof: 'shed', rise: 0.2, lanai: 1, cls: 1, lockers: 1, label: 'Math Building' },
     // Dyer Memorial Library (HABS HI-601-G): T-shaped, a north-south main block with an east wing, multi-gable roof
@@ -171,6 +217,16 @@ function createWorld(canvas) {
     { pl: poly(PP([[960, 1320], [1120, 1180], [1300, 1062], [1480, 984], [1650, 924], [1950, 860]])), depth: 4.5, w: 12 },
   ];
   function naturalH(x, z) {
+    if (!T) return handH(x, z);
+    const [X, Z] = realXZ(x, z);
+    const cx = Math.min(T.x0 + T.nx - 1, Math.max(T.x0 + 1, X)), cz = Math.min(T.z0 + T.nz - 1, Math.max(T.z0 + 1, Z));
+    if (cx === X && cz === Z) return lidarH(X, Z);
+    // beyond the survey the hand-made shape carries on from the survey's edge
+    const [gx, gz] = gameXZ(cx, cz);
+    return lidarH(cx, cz) + handH(x, z) - handH(gx, gz);
+  }
+  // the hand-made terrain, before there was survey data
+  function handH(x, z) {
     let h = -0.03 * z + 1.4 * Math.sin(x * 0.011 + 0.5) * Math.cos(z * 0.009) + 0.5 * Math.sin(x * 0.037 + z * 0.029);
     // the campus sits at the foot of steep grassy slopes that climb toward the Kohala side (north and west)
     const nUp = Math.max(0, -z - 140), wUp = Math.max(0, -x - 170);
@@ -189,12 +245,14 @@ function createWorld(canvas) {
   const UF0 = (() => { const [x, z] = P(UPPER_FIELD.at[0], UPPER_FIELD.at[1]); return { x, z, rot: -UPPER_FIELD.phi * RAD }; })();
   const TERRACE_H = 3.0, STOREY = 3.4;
   function terraceH(x, z) {
+    if (T) return naturalH(x, z); // the survey has the real terraces
     const [lx, lz] = toLocal(UF0, x, z);
     return naturalH(x, z) + TERRACE_H * smooth(-UPPER_FIELD.d / 2 - 2, -UPPER_FIELD.d / 2 - 17 - 26 * smooth(-110, -200, lx), lz) * smooth(185, 160, lx);
   }
   // plateau outline in world metres: 1 = falls away as a grassy bank, 0 = stops at a retaining wall or a building
   const PLATEAU = [[112, -150, 1], [112, -108, 1], [150, -100, 1], [164, -91.5, 0], [186.4, -91.5, 0], [186.4, -67.4, 0], [209.6, -67.4, 0],
     [209.6, -80, 0], [215, -80, 0], [215, -73.2, 0], [250.2, -73.2, 1], [262, -80, 1], [290, -100, 1], [290, -150, 1]];
+  for (let i = 0; i < 4; i++) { PLATEAU[i][0] += LIB_DX; PLATEAU[i][1] += LIB_DZ; } // the library's end of the plateau
   const Y_LOW = terraceH(198, -64.5), PLATEAU_Y = Y_LOW + STOREY;
   function plateauW(x, z) {
     if (x < 90 || x > 312 || z < -172 || z > -50) return 0;
@@ -216,14 +274,15 @@ function createWorld(canvas) {
 
   // floors, stairs and ramps the terrain alone can't make: inside the rectangle the height runs from h0 at local
   // z = -hd to h1 at +hd; the ground mesh drops out of sight under them
-  const ramps = [], sinks = [], noVeg = [], rooms = [], boards = [], fans = [];
+  const ramps = [], sinks = [], noVeg = [], rooms = [], boards = [], fans = [], deskSeats = [];
+  let ENTRANCE = null; // where the visitor drive leaves Kohala Mountain Road, heading in
   const inRect = (r, x, z, pad) => { const [lx, lz] = toLocal(r, x, z), p = pad || 0; return Math.abs(lx) < r.hw + p && Math.abs(lz) < r.hd + p; };
   function addRamp(x, z, rot, hw, hd, h0, h1) {
     ramps.push({ x, z, rot, hw, hd, h0, h1: h1 === undefined ? h0 : h1, rad: Math.hypot(hw, hd) + 0.5 });
     sinks.push({ x, z, rot, hw: hw + 0.3, hd: hd + 0.3 });
   }
   // the track sits a little lower; four concrete seating tiers step up the bank on the north-east straight
-  const TRACK_Y = baseH(0, 0) - 0.7;
+  const TRACK_Y = baseH(0, 0) - (T ? 0 : 0.7);
   const TIER_Z = -(R_OUT + 1.6), TIER_D0 = 1.4, TIER_W = 1.6, TIER_H = 0.45, TIERS = 4, TIER_L = 22;
   function groundH(x, z) {
     let h = baseH(x, z);
@@ -259,6 +318,43 @@ function createWorld(canvas) {
     if (d > w) { const t = w; w = d; d = t; rot += Math.PI / 2; } // ridge always along local x
     return Object.assign({}, b, { x, z, w, d, rot });
   });
+  // buildings known by name move onto their real footprint's centre (unnamed wings within reach go along); the
+  // library and the athletics block stay put for now: their stairs, decks and courts are laid out around them
+  // (data/buildings.json carries the official map's names, so they match the layout's labels)
+  // the library and the gym block are placed below with what is tied to them
+  const KEEP_PLACE = new Set(['Dyer Memorial Library', 'Castle Gymnasium']);
+  const osmMatched = new Set();
+  if (MAP) {
+    const moves = [];
+    for (const b of BUILDINGS) {
+      // the nearest footprint with the same name (one name can cover two buildings)
+      let o = null, od = Infinity;
+      if (b.label) for (const c of MAP.buildings) if (c.name === b.label && !osmMatched.has(c.id)) { const [cx, cz] = ringCentre(c.ring), d = Math.hypot(cx - b.x, cz - b.z); if (d < od) { od = d; o = c; } }
+      if (!o) continue;
+      osmMatched.add(o.id);
+      if (KEEP_PLACE.has(b.label)) continue;
+      const [cx, cz] = ringCentre(o.ring);
+      if (Math.hypot(cx - b.x, cz - b.z) < 12) moves.push({ b, dx: cx - b.x, dz: cz - b.z });
+    }
+    const lib = BUILDINGS.find((b) => b.name === 'library');
+    if (lib) moves.push({ b: lib, dx: LIB_DX, dz: LIB_DZ });
+    // the gym block is two masses on the imagery: the hall to the east and a solar-roofed block to the west. Their
+    // centres and sizes were measured on the Esri imagery in QGIS (data frame, metres; hpa-campus-gis/align_athletics.png)
+    const gym = BUILDINGS.find((b) => b.name === 'castle'), wing = BUILDINGS.find((b) => b.at[0] === 1219 && b.at[1] === 800);
+    if (gym && wing && osmById.has(FP.gym)) {
+      for (const [b, X, Z, w, d] of [[gym, 304.2, 13.9, 44, 41], [wing, 259.6, 5.6, 47, 26]]) {
+        const [gx, gz] = gameXZ(X, Z);
+        b.x = gx; b.z = gz; b.w = w / FIT.scale; b.d = d / FIT.scale; b.rot = -FIT.rotation_deg * RAD; b.placed = true;
+      }
+    }
+    for (const b of BUILDINGS) {
+      if (b.label || b.placed || moves.some((m) => m.b === b)) continue;
+      let near = null, nd = Infinity;
+      for (const m of moves) { const d = Math.hypot(b.x - m.b.x, b.z - m.b.z); if (d < m.b.w / 2 + 22 && d < nd) { nd = d; near = m; } }
+      if (near) moves.push({ b, dx: near.dx, dz: near.dz });
+    }
+    for (const { b, dx, dz } of moves) { b.x += dx; b.z += dz; }
+  }
   const uf = (() => { const [x, z] = P(...UPPER_FIELD.at); return { x, z, rot: -UPPER_FIELD.phi * RAD, hw: UPPER_FIELD.w / 2, hd: UPPER_FIELD.d / 2 }; })();
   const bb = (() => { const [x, z] = P(...BASEBALL.home); return { x, z, rot: -BASEBALL.phi * RAD }; })();
   const pk = (() => { const [x, z] = P(...PARKING.at); return { x, z, rot: -PARKING.phi * RAD, hw: PARKING.w * S / 2, hd: PARKING.d * S / 2 }; })();
@@ -269,10 +365,19 @@ function createWorld(canvas) {
   addPad(pk.x, pk.z, pk.hw + 2, pk.hd + 2, pk.rot, 8);
   for (const b of BUILDINGS) addPad(b.x, b.z, b.w / 2 + 2.5 + (b.name === 'robertson' ? 15 : 0), b.d / 2 + 2.5, b.rot, 7);
   const POOL = (() => { const [x, z] = P(1352, 673); return { x, z, rot: -33 * RAD, WL: 25, WW: 18, DL: 38, DW: 31, depth: 1.9 }; })();
+  // the pool deck onto its footprint, turned to match (keeping the turn nearest the hand-made one)
+  if (osmById.has(FP.pool)) {
+    const fb = footprintBox(osmById.get(FP.pool).ring);
+    POOL.x = fb.x; POOL.z = fb.z;
+    let r = fb.rot; for (const k of [-1, 1, -0.5, 0.5]) if (Math.abs(fb.rot + k * Math.PI - POOL.rot) < Math.abs(r - POOL.rot)) r = fb.rot + k * Math.PI;
+    POOL.rot = r;
+  }
   addPad(POOL.x, POOL.z, 21, 17, POOL.rot, 8);
   const TENNIS = (() => { const [x, z] = P(1258, 915); return { x, z, rot: 0, hw: 36.2, hd: 22.2, eave: 7, ridge: 14, ridgeZ: 6 }; })();
+  { const [dx, dz] = shiftTo(FP.tennis, TENNIS.x, TENNIS.z); TENNIS.x += dx; TENNIS.z += dz; }
   addPad(TENNIS.x - 3, TENNIS.z, TENNIS.hw + 9, TENNIS.hd + 4, TENNIS.rot, 8);
-  const SOLAR_FIELD = (() => { const [x, z] = P(1890, 175); return { x, z, rot: 0 }; })();
+  // the Energy Lab's array: five rows, 48 x 22 m, just north of the lab (measured on the imagery in QGIS, data frame)
+  const SOLAR_FIELD = (() => { const [x, z] = MAP ? gameXZ(448.75, -306.6) : P(1890, 175); return { x, z, rot: -(FIT.rotation_deg || 0) * RAD, rows: MAP ? 5 : 9, segs: MAP ? 4 : 7, pitch: MAP ? 4.4 : 6.5 }; })();
   const FARM = (() => { const [x, z] = P(2050, 545); return { x, z, rot: 0.35 }; })();
   const KSQ = { x: 205.5, z: -101.3, rot: 0, hw: 8.75, hd: 8.1 }; // Kennedy Square, on the plateau
   addPad(FARM.x, FARM.z, 22, 14, FARM.rot, 10);
@@ -286,7 +391,7 @@ function createWorld(canvas) {
   // ---------- the middle plateau's edges: union, dining hall, library approach (layout only; meshes come later) ----------
   const UNION = { x: 201.8, z: -78.0, rot: 0, hw: 7.8, hd: 10.6 };   // main block; its west wing runs on to x = 186.4
   const DINING = { x: 232.5, z: -87.5, rot: 0, hw: 17.2, hd: 14.3 };
-  const LIB_DECK = { x: 174.3, z: -93.1, rot: 0, hw: 12.9, hd: 1.6 }; // south deck of Dyer Library on its lava retaining wall
+  const LIB_DECK = { x: (174.3 + LIB_DX), z: (-93.1 + LIB_DZ), rot: 0, hw: 12.9, hd: 1.6 }; // south deck of Dyer Library on its lava retaining wall
   const Y_DECK = PLATEAU_Y + 0.6;
   const railC = (x0, z0, x1, z1) => box((x0 + x1) / 2, (z0 + z1) / 2, Math.max(Math.abs(x1 - x0) / 2, 0.12), Math.max(Math.abs(z1 - z0) / 2, 0.12), 0);
   // union: store porch on the lawn, exterior stair on the east side down from the square
@@ -305,24 +410,52 @@ function createWorld(canvas) {
   railC(215.3, -70.2, 242.5, -70.2); railC(245.0, -70.2, 249.7, -70.2); railC(215.3, -73.2, 215.3, -70.2); railC(249.7, -73.2, 249.7, -70.2);
   railC(242.4, -70.2, 242.4, -70.2 + DSTAIR.L); railC(245.1, -70.2, 245.1, -70.2 + DSTAIR.L);
   // library: the deck, a switchback ramp with lava cheekwalls along the retaining wall, and a concrete stair (HABS)
-  const ZZ = (() => { const yg = groundH(185, -86.5); return { yg, ym: (yg + Y_DECK) / 2 }; })();
+  const ZZ = (() => { const yg = groundH((185 + LIB_DX), (-86.5 + LIB_DZ)); return { yg, ym: (yg + Y_DECK) / 2 }; })();
   addRamp(LIB_DECK.x, LIB_DECK.z, 0, LIB_DECK.hw, LIB_DECK.hd, Y_DECK);
-  addRamp(175.8, -88.2, Math.PI / 2, 0.8, 7.8, ZZ.ym, ZZ.yg);          // lower run, climbing west
-  addRamp(184.95, -88.2, Math.PI / 2, 0.8, 1.35, ZZ.yg);               // its entry
-  addRamp(166.7, -89.45, Math.PI / 2, 2.0, 1.3, ZZ.ym);                // landing
-  addRamp(175.8, -90.5, Math.PI / 2, 0.95, 7.8, ZZ.ym, Y_DECK);        // upper run, climbing east to the deck
-  addRamp(184.95, -90.55, Math.PI / 2, 1.0, 1.35, Y_DECK);             // top landing
-  const LSTAIR = (() => { const g0 = groundH(163, -84), L = Math.max(4, (Y_DECK - g0) / 0.62); return { x: 163.0, L, g0 }; })();
-  addRamp(LSTAIR.x, -91.5 + LSTAIR.L / 2, 0, 1.4, LSTAIR.L / 2, Y_DECK, LSTAIR.g0);
-  railC(168.0, -89.3, 186.3, -89.3); railC(165.2, -87.2, 183.6, -87.2); railC(165.2, -91.5, 165.2, -87.0);
-  railC(161.5, -91.5, 161.5, -91.5 + LSTAIR.L); railC(164.5, -91.5, 164.5, -91.5 + LSTAIR.L);
-  railC(164.4, -91.45, 183.6, -91.45); railC(161.4, -94.7, 161.4, -91.5);
+  addRamp((175.8 + LIB_DX), (-88.2 + LIB_DZ), Math.PI / 2, 0.8, 7.8, ZZ.ym, ZZ.yg);          // lower run, climbing west
+  addRamp((184.95 + LIB_DX), (-88.2 + LIB_DZ), Math.PI / 2, 0.8, 1.35, ZZ.yg);               // its entry
+  addRamp((166.7 + LIB_DX), (-89.45 + LIB_DZ), Math.PI / 2, 2.0, 1.3, ZZ.ym);                // landing
+  addRamp((175.8 + LIB_DX), (-90.5 + LIB_DZ), Math.PI / 2, 0.95, 7.8, ZZ.ym, Y_DECK);        // upper run, climbing east to the deck
+  addRamp((184.95 + LIB_DX), (-90.55 + LIB_DZ), Math.PI / 2, 1.0, 1.35, Y_DECK);             // top landing
+  const LSTAIR = (() => { const g0 = groundH((163 + LIB_DX), (-84 + LIB_DZ)), L = Math.max(4, (Y_DECK - g0) / 0.62); return { x: (163.0 + LIB_DX), L, g0 }; })();
+  addRamp(LSTAIR.x, (-91.5 + LIB_DZ) + LSTAIR.L / 2, 0, 1.4, LSTAIR.L / 2, Y_DECK, LSTAIR.g0);
+  railC((168.0 + LIB_DX), (-89.3 + LIB_DZ), (186.3 + LIB_DX), (-89.3 + LIB_DZ)); railC((165.2 + LIB_DX), (-87.2 + LIB_DZ), (183.6 + LIB_DX), (-87.2 + LIB_DZ)); railC((165.2 + LIB_DX), (-91.5 + LIB_DZ), (165.2 + LIB_DX), (-87.0 + LIB_DZ));
+  railC((161.5 + LIB_DX), (-91.5 + LIB_DZ), (161.5 + LIB_DX), (-91.5 + LIB_DZ) + LSTAIR.L); railC((164.5 + LIB_DX), (-91.5 + LIB_DZ), (164.5 + LIB_DX), (-91.5 + LIB_DZ) + LSTAIR.L);
+  railC((164.4 + LIB_DX), (-91.45 + LIB_DZ), (183.6 + LIB_DX), (-91.45 + LIB_DZ)); railC((161.4 + LIB_DX), (-94.7 + LIB_DZ), (161.4 + LIB_DX), (-91.5 + LIB_DZ));
   // no trees or tufts on floors, decks and stairs
-  noVeg.push({ x: 198, z: -76, rot: 0, hw: 12.5, hd: 13.5 }, { x: 232.5, z: -82, rot: 0, hw: 18, hd: 21 }, { x: 174, z: -88, rot: 0, hw: 14, hd: 8 },
+  noVeg.push({ x: 198, z: -76, rot: 0, hw: 12.5, hd: 13.5 }, { x: 232.5, z: -82, rot: 0, hw: 18, hd: 21 }, { x: 174 + LIB_DX, z: -88 + LIB_DZ, rot: 0, hw: 14, hd: 8 },
     { x: 200.5, z: -99, rot: 0, hw: 14.5, hd: 11.5 });
   sinks.push({ x: 198, z: -78, rot: 0, hw: 11.6, hd: 10.6 }, { x: 232.5, z: -87.5, rot: 0, hw: 17.2, hd: 14.3 });
   rooms.push({ x: UNION.x, z: UNION.z, rot: 0, hw: UNION.hw - 0.3, hd: UNION.hd - 0.3, y0: PLATEAU_Y, top: 3.3 },
     { x: DINING.x, z: DINING.z, rot: 0, hw: DINING.hw - 0.3, hd: DINING.hd - 0.3, y0: PLATEAU_Y, top: 3.5 });
+
+  // ---------- campus buildings the hand-made map didn't have, from their footprints ----------
+  if (MAP) {
+    const taken = [...BUILDINGS.map((b) => ({ x: b.x, z: b.z, rot: b.rot, hw: b.w / 2 + 3, hd: b.d / 2 + 3 })), Object.assign({}, UNION, { hw: UNION.hw + 16 }), DINING, LIB_DECK, KSQ,
+      { x: POOL.x, z: POOL.z, rot: POOL.rot, hw: POOL.DL / 2 + 3, hd: POOL.DW / 2 + 3 }, { x: TENNIS.x, z: TENNIS.z, rot: 0, hw: TENNIS.hw + 10, hd: TENNIS.hd + 6 }];
+    for (const o of MAP.buildings) {
+      if (!o.campus || osmMatched.has(o.id)) continue;
+      const fb = footprintBox(o.ring);
+      if (fb.area < 18 || fb.area > 2500 || taken.some((r) => inRect(r, fb.x, fb.z))) continue;
+      const h = Math.max(2.6, Math.min(6.2, o.height - 1.4));
+      BUILDINGS.push({ x: fb.x, z: fb.z, w: fb.w, d: fb.d, rot: fb.rot, h, wall: 'wood', ends: 'stone', roof: fb.w > 30 ? 'gable' : 'hip', rise: 0.22, label: o.name || undefined, osm: o.id });
+      addPad(fb.x, fb.z, fb.w / 2 + 2.5, fb.d / 2 + 2.5, fb.rot, 7);
+      taken.push({ x: fb.x, z: fb.z, rot: fb.rot, hw: fb.w / 2 + 3, hd: fb.d / 2 + 3 });
+    }
+  }
+
+  // ---------- grounds from the official campus map: polo field, softball field, Hawaiian star compass ----------
+  // Placed at the map's numbered places (data/official_map.json) and measured on the imagery in QGIS (data frame,
+  // metres): the polo field is the strip between the track's pine row and Kohala Mountain Road, along the track; the
+  // softball diamond's home plate is at its north-east corner, the outfield opening to the south-west; the compass
+  // is the pale circle on the north-east slope.
+  const PLACE = (n) => { const p = MAP && MAP.official && MAP.official.places.find((q) => q.n === n); return p ? gameXZ(p.label[0], p.label[1]) : null; };
+  const POLO = (() => { const c = PLACE(36); return c && { x: c[0], z: c[1], rot: TRACK.rot, hw: 100, hd: 15 }; })();
+  const SOFT = MAP ? (() => { const [x, z] = gameXZ(593.8, -12.5), [fx, fz] = gameXZ(593.8 - 0.643, -12.5 + 0.766); return { x, z, rot: Math.atan2(fx - x, fz - z) }; })() : null;
+  const COMPASS = MAP ? (() => { const [x, z] = gameXZ(534.8, -222); return { x, z }; })() : null;
+  if (POLO) noVeg.push(Object.assign({}, POLO, { hw: POLO.hw + 3, hd: POLO.hd + 2 }));
+  if (SOFT) { const [x, z] = toWorld(SOFT, 0, 28); noVeg.push({ x, z, rot: SOFT.rot, hw: 46, hd: 38 }); }
+  if (COMPASS) noVeg.push({ x: COMPASS.x, z: COMPASS.z, rot: 0, hw: 7, hd: 7 });
 
   // ---------- helpers ----------
   function canvasTex(w, h, draw, linear) {
@@ -1077,6 +1210,8 @@ function createWorld(canvas) {
       for (const [lx, lz] of [[-0.33, -0.05], [0.03, -0.05], [-0.33, -0.44], [0.03, -0.44]]) d.push({ g: new THREE.BoxGeometry(0.035, 0.45, 0.035).translate(lx, 0.22, lz), c: metal });
       for (const q of d) { q.g.rotateY(face); q.g.translate(x, floor, z); parts.push(q); }
       const [wx, wz] = toWorld(b, x, z); colliders.circles.push({ x: wx, z: wz, r: 0.45 });
+      // the chair is a seat: sitting there faces the desk
+      { const [cx, cz] = toWorld(b, x - 0.15 * Math.cos(face) - 0.25 * Math.sin(face), z + 0.15 * Math.sin(face) - 0.25 * Math.cos(face)); deskSeats.push({ id: 'cl' + boards.length + '_' + i, x: cx, z: cz, y: y0 + fl + 0.45, ry: face + b.rot, room: b.label || 'Classroom' }); }
     }
     parts.push({ g: new THREE.BoxGeometry(0.8, 0.05, 1.6).translate(RW - 1.6, floor + 0.75, 1.8), c: wood });
     for (const [lx, lz] of [[-0.35, -0.7], [0.35, -0.7], [-0.35, 0.7], [0.35, 0.7]]) parts.push({ g: new THREE.BoxGeometry(0.05, 0.75, 0.05).translate(RW - 1.6 + lx, floor + 0.37, 1.8 + lz), c: metal });
@@ -1887,22 +2022,22 @@ function createWorld(canvas) {
     const deck = new THREE.Mesh(new THREE.BoxGeometry(2 * D.hw, 0.18, 2 * D.hd), deckMat); deck.position.set(D.x, Y_DECK - 0.09, D.z); deck.receiveShadow = true; deck.castShadow = true; scene.add(deck);
     const stoneBox = (x0, x1, z0, z1, yb, yt) => { const w = x1 - x0, d = z1 - z0, h = yt - yb; const m = new THREE.Mesh(uvBox(new THREE.BoxGeometry(w, h, d), [w, h, d], 8, 4), wallMat('stone')); m.position.set((x0 + x1) / 2, (yb + yt) / 2, (z0 + z1) / 2); m.castShadow = true; m.receiveShadow = true; scene.add(m); };
     const yb = Math.min(ZZ.yg, LSTAIR.g0) - 1.0;
-    stoneBox(164.4, 186.4, -92.1, -91.5, yb, Y_DECK - 0.18);
+    stoneBox((164.4 + LIB_DX), (186.4 + LIB_DX), (-92.1 + LIB_DZ), (-91.5 + LIB_DZ), yb, Y_DECK - 0.18);
     // ramps: concrete slabs; cheekwalls of lava rock following the slope
     const slope = (x0, y0, x1, y1, z0, z1, th) => { const sh = new THREE.Shape(); sh.moveTo(x0, y0 - th); sh.lineTo(x1, y1 - th); sh.lineTo(x1, y1); sh.lineTo(x0, y0); sh.closePath(); const geo = new THREE.ExtrudeGeometry(sh, { depth: z1 - z0, bevelEnabled: false }); geo.translate(0, 0, z0); return geo; };
-    parts.push({ g: slope(168.0, ZZ.ym, 183.6, ZZ.yg, -89.0, -87.4, 0.3), c: conc }, { g: slope(168.0, ZZ.ym, 183.6, Y_DECK, -91.45, -89.55, 0.3), c: conc });
-    parts.push({ g: new THREE.BoxGeometry(2.7, 0.3, 1.6).translate(184.95, ZZ.yg - 0.15, -88.2), c: conc }, { g: new THREE.BoxGeometry(2.6, 0.3, 4.0).translate(166.7, ZZ.ym - 0.15, -89.45), c: conc }, { g: new THREE.BoxGeometry(2.7, 0.3, 2.0).translate(184.95, Y_DECK - 0.15, -90.55), c: conc });
+    parts.push({ g: slope((168.0 + LIB_DX), ZZ.ym, (183.6 + LIB_DX), ZZ.yg, (-89.0 + LIB_DZ), (-87.4 + LIB_DZ), 0.3), c: conc }, { g: slope((168.0 + LIB_DX), ZZ.ym, (183.6 + LIB_DX), Y_DECK, (-91.45 + LIB_DZ), (-89.55 + LIB_DZ), 0.3), c: conc });
+    parts.push({ g: new THREE.BoxGeometry(2.7, 0.3, 1.6).translate((184.95 + LIB_DX), ZZ.yg - 0.15, (-88.2 + LIB_DZ)), c: conc }, { g: new THREE.BoxGeometry(2.6, 0.3, 4.0).translate((166.7 + LIB_DX), ZZ.ym - 0.15, (-89.45 + LIB_DZ)), c: conc }, { g: new THREE.BoxGeometry(2.7, 0.3, 2.0).translate((184.95 + LIB_DX), Y_DECK - 0.15, (-90.55 + LIB_DZ)), c: conc });
     const cheek = (x0, y0, x1, y1, z0, z1) => { const geo = slope(x0, y0, x1, y1, z0, z1, Math.max(y0, y1) - yb); const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 8, uv.getY(i) / 4); const m = new THREE.Mesh(geo, wallMat('stone')); m.castShadow = true; m.receiveShadow = true; scene.add(m); };
-    cheek(168.0, Y_DECK + 0.45, 186.3, Y_DECK + 0.45, -89.6, -89.0);
-    cheek(168.0, ZZ.ym + 0.45, 183.6, ZZ.yg + 0.45, -87.4, -87.0);
-    cheek(165.0, ZZ.ym + 0.5, 165.4, ZZ.ym + 0.5, -91.5, -87.0);
+    cheek((168.0 + LIB_DX), Y_DECK + 0.45, (186.3 + LIB_DX), Y_DECK + 0.45, (-89.6 + LIB_DZ), (-89.0 + LIB_DZ));
+    cheek((168.0 + LIB_DX), ZZ.ym + 0.45, (183.6 + LIB_DX), ZZ.yg + 0.45, (-87.4 + LIB_DZ), (-87.0 + LIB_DZ));
+    cheek((165.0 + LIB_DX), ZZ.ym + 0.5, (165.4 + LIB_DX), ZZ.ym + 0.5, (-91.5 + LIB_DZ), (-87.0 + LIB_DZ));
     // stair at the west end of the deck
     const nS = Math.max(4, Math.round((Y_DECK - LSTAIR.g0) / 0.17)), tread = LSTAIR.L / nS;
-    for (let i = 0; i < nS; i++) { const top = Y_DECK - (i + 1) * (Y_DECK - LSTAIR.g0) / nS; parts.push({ g: new THREE.BoxGeometry(2.8, top - yb, tread + 0.02).translate(LSTAIR.x, (top + yb) / 2, -91.5 + (i + 0.5) * tread), c: conc }); }
-    for (const x of [161.55, 164.45]) { parts.push(beamPart(x, Y_DECK + 0.95, -91.5, x, LSTAIR.g0 + 0.95, -91.5 + LSTAIR.L, 0.06, 0.06, steel)); for (let t = 0; t <= 1.001; t += 0.25) parts.push({ g: new THREE.BoxGeometry(0.05, 0.95, 0.05).translate(x, Y_DECK + (LSTAIR.g0 - Y_DECK) * t + 0.47, -91.5 + LSTAIR.L * t), c: steel }); }
+    for (let i = 0; i < nS; i++) { const top = Y_DECK - (i + 1) * (Y_DECK - LSTAIR.g0) / nS; parts.push({ g: new THREE.BoxGeometry(2.8, top - yb, tread + 0.02).translate(LSTAIR.x, (top + yb) / 2, (-91.5 + LIB_DZ) + (i + 0.5) * tread), c: conc }); }
+    for (const x of [(161.55 + LIB_DX), (164.45 + LIB_DX)]) { parts.push(beamPart(x, Y_DECK + 0.95, (-91.5 + LIB_DZ), x, LSTAIR.g0 + 0.95, (-91.5 + LIB_DZ) + LSTAIR.L, 0.06, 0.06, steel)); for (let t = 0; t <= 1.001; t += 0.25) parts.push({ g: new THREE.BoxGeometry(0.05, 0.95, 0.05).translate(x, Y_DECK + (LSTAIR.g0 - Y_DECK) * t + 0.47, (-91.5 + LIB_DZ) + LSTAIR.L * t), c: steel }); }
     // cable rails on the deck
     const railRun = (x0, z0, x1, z1) => { const L = Math.hypot(x1 - x0, z1 - z0); for (let t = 0; t <= L + 0.01; t += 1.6) { const f = t / L; parts.push({ g: new THREE.BoxGeometry(0.06, 1.0, 0.06).translate(x0 + (x1 - x0) * f, Y_DECK + 0.5, z0 + (z1 - z0) * f), c: steel }); } parts.push(beamPart(x0, Y_DECK + 1.02, z0, x1, Y_DECK + 1.02, z1, 0.1, 0.06, timber)); for (let k = 1; k <= 5; k++) parts.push(beamPart(x0, Y_DECK + k * 0.17, z0, x1, Y_DECK + k * 0.17, z1, 0.015, 0.015, steel)); };
-    railRun(164.4, -91.6, 183.6, -91.6); railRun(161.45, -94.7, 161.45, -91.6);
+    railRun((164.4 + LIB_DX), (-91.6 + LIB_DZ), (183.6 + LIB_DX), (-91.6 + LIB_DZ)); railRun((161.45 + LIB_DX), (-94.7 + LIB_DZ), (161.45 + LIB_DX), (-91.6 + LIB_DZ));
     const pm = new THREE.Mesh(mergeGeoms(parts), trimMat); pm.castShadow = true; pm.receiveShadow = true; scene.add(pm);
     // the main door: natural wood with concentric lines radiating from a diamond at the height of the knob
     const doorTex = canvasTex(128, 192, (c, W2, H2) => { c.fillStyle = '#9a6b42'; c.fillRect(0, 0, W2, H2); c.strokeStyle = 'rgba(60,35,15,0.55)'; c.lineWidth = 3; for (let k = 1; k < 9; k++) { const r = k * 11; c.beginPath(); c.moveTo(W2 / 2, 100 - r); c.lineTo(W2 / 2 + r * 0.75, 100); c.lineTo(W2 / 2, 100 + r); c.lineTo(W2 / 2 - r * 0.75, 100); c.closePath(); c.stroke(); } c.fillStyle = '#d6b26a'; c.fillRect(W2 - 18, 96, 8, 10); });
@@ -1953,6 +2088,7 @@ function createWorld(canvas) {
     const rd = ROADS[1].pts.map(([px, py]) => P(px, py));
     const along = (s0) => { let s1 = s0; for (let i = 0; i < rd.length - 1; i++) { const [ax, az] = rd[i], [bx, bz] = rd[i + 1], L = Math.hypot(bx - ax, bz - az); if (s1 <= L || i === rd.length - 2) { const f = s1 / L, dx = (bx - ax) / L, dz = (bz - az) / L; return { x: ax + (bx - ax) * f, z: az + (bz - az) * f, dx, dz, rx: -dz, rz: dx }; } s1 -= L; } };
     const at = (s0, off) => { const q = along(s0); return [q.x + q.rx * off, q.z + q.rz * off]; };
+    { const q = along(18); ENTRANCE = { x: q.x, z: q.z, ry: Math.atan2(q.dx, q.dz) }; }
     // sign wall facing the cars coming in, bronze plaque, a bed of pink ice plant in a grey block planter
     { const q = along(12), [x, z] = at(12, 8.5), y = groundH(x, z), sg = new THREE.Group(); sg.position.set(x, y, z); sg.rotation.y = Math.atan2(-q.dx, -q.dz); scene.add(sg);
       const w = new THREE.Mesh(uvBox(new THREE.BoxGeometry(5.4, 2.5, 1.1), [5.4, 2.5, 1.1], 4, 2), wallMat('stone')); w.position.y = 1.15; w.castShadow = true; w.receiveShadow = true; sg.add(w);
@@ -1998,7 +2134,7 @@ function createWorld(canvas) {
 
   // ---------- benches, bleacher seats, golf carts ----------
   // every seat: world position, seat height and the heading of someone sitting on it
-  const seats = [];
+  const seats = deskSeats.slice();
   const benchWood = new THREE.MeshStandardMaterial({ color: C('#7a5a3e'), roughness: 0.8 });
   const benchLeg = new THREE.MeshStandardMaterial({ color: C('#3a2c22'), roughness: 0.8 });
   function bench(x, z, rot) {
@@ -2085,6 +2221,7 @@ function createWorld(canvas) {
   }
   // seat 0 = driver (left side), seat 1 = passenger; world x, z and seat height
   function cartSeat(c, seat) { const [x, z] = toWorld({ x: c.x, z: c.z, rot: c.ry }, seat === 0 ? 0.27 : -0.27, -0.1); return { x, z, y: groundH(c.x, c.z) + 0.78 }; }
+  let makeCart = null; // a cart of the story's own (not one players can take)
   (function golfCarts() {
     const cartBody = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0.15 });
     const cartGlass = new THREE.MeshStandardMaterial({ color: C('#cfe3ee'), transparent: true, opacity: 0.25, roughness: 0.1, side: THREE.DoubleSide, depthWrite: false });
@@ -2129,6 +2266,7 @@ function createWorld(canvas) {
       [...toWorld(ml, 14, ml.d / 2 + 22), ml.rot + 2.4],
     ];
     spots.forEach(([x, z, ry], i) => { const c = { id: 'cart' + i, mesh: cartMesh(), home: { x, z, ry } }; placeCart(c, x, z, ry); carts.push(c); });
+    makeCart = () => ({ id: 'story', mesh: cartMesh(), x: 0, z: 0, ry: 0 });
   })();
 
   // ---------- trees ----------
@@ -2309,8 +2447,9 @@ function createWorld(canvas) {
   // ---------- ground-mounted solar field on the north slope (the Energy Lab's array) ----------
   (function solarField() {
     const items = [];
-    for (let row = 0; row < 9; row++) for (let seg = 0; seg < 7; seg++) {
-      const [x, z] = toWorld(SOLAR_FIELD, -36 + seg * 12, -24 + row * 6.5);
+    const F2 = SOLAR_FIELD;
+    for (let row = 0; row < F2.rows; row++) for (let seg = 0; seg < F2.segs; seg++) {
+      const [x, z] = toWorld(F2, (seg - (F2.segs - 1) / 2) * 12, (row - (F2.rows - 1) / 2) * F2.pitch);
       items.push({ x, z });
     }
     const pm = panelMatFor(12, 3.2);
@@ -2333,6 +2472,73 @@ function createWorld(canvas) {
     for (const lx of [12, 16]) { const [x, z] = toWorld(FARM, lx, -5); const t = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 2.2, 20), tankMat); t.position.set(x, groundH(x, z) + 1.1, z); t.castShadow = true; scene.add(t); colliders.circles.push({ x, z, r: 1.8 }); }
     const [sx, sz] = toWorld(FARM, 14, 5);
     building({ x: sx, z: sz, w: 8, d: 4.5, h: 2.6, rot: FARM.rot, wall: 'wood', ends: 'wood', roof: 'shed', rise: 0.2 });
+  })();
+
+  (function officialGrounds() {
+    const white = C('#f4f2ea'), parts = [];
+    const flat = (w, l, x, z, rot, lift, mat) => scene.add(Object.assign(new THREE.Mesh(drape(new THREE.PlaneGeometry(w, l, Math.max(1, Math.round(w / 4)), Math.max(1, Math.round(l / 4))).rotateX(-Math.PI / 2), x, z, rot, lift), mat), { receiveShadow: true }));
+    // polo field: a mown strip with low white boards along the sides and goals at the ends
+    if (POLO) {
+      const tex = canvasTex(1024, 160, (g, W2, H2) => {
+        for (let i = 0; i < 16; i++) { g.fillStyle = i % 2 ? '#6f9a43' : '#7ea84c'; g.fillRect(i * W2 / 16, 0, W2 / 16 + 1, H2); }
+        g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 3; g.strokeRect(4, 4, W2 - 8, H2 - 8);
+        g.beginPath(); g.moveTo(W2 / 2, 4); g.lineTo(W2 / 2, H2 - 4); g.stroke();
+      });
+      flat(2 * POLO.hw, 2 * POLO.hd, POLO.x, POLO.z, POLO.rot, 0.05, overlayMat(tex)); // long side along the polo frame's x
+      for (let lx = -POLO.hw; lx < POLO.hw; lx += 8) for (const sd of [-1, 1]) {
+        const [x, z] = toWorld(POLO, lx + 4, sd * POLO.hd), y = groundH(x, z);
+        parts.push({ g: new THREE.BoxGeometry(8, 0.28, 0.08).rotateY(POLO.rot).translate(x, y + 0.14, z), c: white });
+      }
+      for (const ex of [-1, 1]) for (const gz of [-3.65, 3.65]) {
+        const [x, z] = toWorld(POLO, ex * POLO.hw, gz), y = groundH(x, z);
+        parts.push({ g: new THREE.CylinderGeometry(0.09, 0.11, 3.0, 10).translate(x, y + 1.5, z), c: white });
+        colliders.circles.push({ x, z, r: 0.2 });
+      }
+    }
+    // softball field: an all-dirt diamond, white bases and foul lines, a chain-link backstop, a green outfield windscreen
+    if (SOFT) {
+      const B = 18.29, R = 61, d45 = Math.SQRT1_2;
+      const dirt = overlayMat(null, { color: C('#9a6a48'), roughness: 1 }), chalk = overlayMat(null, { color: white, polygonOffsetFactor: -5, polygonOffsetUnits: -5 });
+      { const [x, z] = toWorld(SOFT, 0, B * d45); flat(B + 7, B + 7, x, z, SOFT.rot + Math.PI / 4, 0.06, dirt); }
+      { const [x, z] = toWorld(SOFT, 0, -1); flat(9, 9, x, z, SOFT.rot + Math.PI / 4, 0.06, dirt); }
+      for (const sd of [-1, 1]) { const [x, z] = toWorld(SOFT, sd * R / 2 * d45, R / 2 * d45); flat(0.12, R, x, z, SOFT.rot + sd * Math.PI / 4, 0.08, chalk); }
+      for (const [lx, lz] of [[0, 0], [B * d45, B * d45], [0, 2 * B * d45], [-B * d45, B * d45]]) {
+        const [x, z] = toWorld(SOFT, lx, lz); parts.push({ g: new THREE.BoxGeometry(0.4, 0.06, 0.4).rotateY(SOFT.rot + Math.PI / 4).translate(x, groundH(x, z) + 0.07, z), c: white });
+      }
+      const post = C('#6c7176'), wind = C('#2f4f35');
+      for (let a = -Math.PI / 4; a <= Math.PI / 4 + 1e-6; a += Math.PI / 2 / 24) {
+        const a2 = a + Math.PI / 2 / 24, [x, z] = toWorld(SOFT, Math.sin(a) * R, Math.cos(a) * R), y = groundH(x, z);
+        parts.push({ g: new THREE.CylinderGeometry(0.04, 0.04, 1.4, 6).translate(x, y + 0.7, z), c: post });
+        if (a2 <= Math.PI / 4 + 1e-6) {
+          const [x2, z2] = toWorld(SOFT, Math.sin(a2) * R, Math.cos(a2) * R), L = Math.hypot(x2 - x, z2 - z), y2 = groundH((x + x2) / 2, (z + z2) / 2);
+          parts.push({ g: new THREE.BoxGeometry(L, 1.2, 0.05).rotateY(-Math.atan2(z2 - z, x2 - x)).translate((x + x2) / 2, y2 + 0.65, (z + z2) / 2), c: wind });
+        }
+      }
+      // backstop: posts and a see-through chain-link screen on an arc behind home plate
+      const mesh = new THREE.MeshStandardMaterial({ color: C('#9ca3a8'), transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false });
+      for (let a = Math.PI * 0.72; a <= Math.PI * 1.28 + 1e-6; a += Math.PI * 0.07) {
+        const a2 = a + Math.PI * 0.07, [x, z] = toWorld(SOFT, Math.sin(a) * 7, Math.cos(a) * 7), y = groundH(x, z);
+        parts.push({ g: new THREE.CylinderGeometry(0.05, 0.05, 4, 6).translate(x, y + 2, z), c: post });
+        colliders.circles.push({ x, z, r: 0.25 });
+        if (a2 <= Math.PI * 1.28 + 1e-6) {
+          const [x2, z2] = toWorld(SOFT, Math.sin(a2) * 7, Math.cos(a2) * 7), L = Math.hypot(x2 - x, z2 - z);
+          const sc = new THREE.Mesh(new THREE.PlaneGeometry(L, 3.8), mesh); sc.position.set((x + x2) / 2, groundH((x + x2) / 2, (z + z2) / 2) + 1.9, (z + z2) / 2); sc.rotation.y = -Math.atan2(z2 - z, x2 - x); scene.add(sc);
+        }
+      }
+    }
+    // Hawaiian star compass: 32 lava stones in a ring for the houses of the rising and setting stars, taller ones at
+    // the four quarters, a flat stone in the middle
+    if (COMPASS) {
+      const lava = C('#3b3633'), r0 = rng(26);
+      for (let i = 0; i < 32; i++) {
+        const a = i / 32 * Math.PI * 2, x = COMPASS.x + Math.sin(a) * 4.2, z = COMPASS.z - Math.cos(a) * 4.2, y = groundH(x, z), tall = i % 8 === 0, h = tall ? 1.25 : 0.45 + r0() * 0.25;
+        parts.push({ g: new THREE.DodecahedronGeometry(tall ? 0.32 : 0.24, 0).scale(1, h / (tall ? 0.6 : 0.45), 1).rotateY(r0() * 3).translate(x, y + h / 2, z), c: lava });
+        colliders.circles.push({ x, z, r: tall ? 0.35 : 0.25 });
+      }
+      parts.push({ g: new THREE.CylinderGeometry(0.7, 0.8, 0.25, 9).translate(COMPASS.x, groundH(COMPASS.x, COMPASS.z) + 0.12, COMPASS.z), c: lava });
+      scene.add(Object.assign(new THREE.Mesh(drape(new THREE.CircleGeometry(5.2, 40).rotateX(-Math.PI / 2), COMPASS.x, COMPASS.z, 0, 0.05), overlayMat(null, { color: C('#b9ad8f'), roughness: 1 })), { receiveShadow: true }));
+    }
+    if (parts.length) { const m = new THREE.Mesh(mergeGeoms(parts), trimMat); m.castShadow = true; m.receiveShadow = true; scene.add(m); }
   })();
 
   // ---------- name signs: lava-rock base, dark board, cream letters ----------
@@ -2362,6 +2568,9 @@ function createWorld(canvas) {
   { const [x, z] = toWorld(FARM, -20, 12); sign(x, z, FARM.rot, 'Ulu Mālama Terrace Farm', true); }
   { const [x, z] = toWorld(TRACK, -(TL + R_OUT + 6), -8); sign(x, z, TRACK.rot - Math.PI / 2, 'Stanford W. Shutes Track', true); }
   { const [x, z] = P(570, 1203); sign(x, z, -0.45, 'Hawaiʻi Preparatory Academy', true); }
+  if (POLO) { const [x, z] = toWorld(POLO, -POLO.hw + 12, POLO.hd + 4); sign(x, z, POLO.rot, 'Polo Field'); }
+  if (SOFT) { const [x, z] = toWorld(SOFT, -8, -9); sign(x, z, SOFT.rot + Math.PI, 'Softball Field'); }
+  if (COMPASS) sign(COMPASS.x, COMPASS.z + 7.5, 0, 'Hawaiian Star Compass', true);
 
   // ---------- cars, bus ----------
   (function cars() {
@@ -2439,16 +2648,27 @@ function createWorld(canvas) {
   (function houses() {
     const hwyY = (px) => { const pts = ROADS[0].pts; for (let i = 0; i < pts.length - 1; i++) { if (px >= pts[i][0] && px <= pts[i + 1][0]) { const t = (px - pts[i][0]) / (pts[i + 1][0] - pts[i][0]); return pts[i][1] + t * (pts[i + 1][1] - pts[i][1]); } } return 2000; };
     const items = [];
-    const tryAdd = (x, z, w, d) => {
+    let tryAdd = (x, z, w, d) => {
       if (blocked(x, z, Math.max(w, d) * 0.7 + 2)) return;
       for (const h of items) if (Math.hypot(h.x - x, h.z - z) < Math.max(w, d) + 6) return;
       items.push({ x, z, w, d, h: 3 + R() * 1.4, rot: R() < 0.6 ? -40 * RAD + (R() - 0.5) * 0.3 : R() * 6.28 });
     };
-    for (let i = 0; i < 2500 && items.length < 60; i++) { const px = R() * 560, py = 700 + R() * 600; if (py < hwyY(px) + 45) continue; const [x, z] = P(px, py); tryAdd(x, z, 10 + R() * 6, 8 + R() * 5); }
-    for (let i = 0; i < 1500 && items.length < 85; i++) { const px = 600 + R() * 450, py = 1235 + R() * 120; const [x, z] = P(px, py); tryAdd(x, z, 10 + R() * 6, 8 + R() * 5); }
-    for (let i = 0; i < 1500 && items.length < 105; i++) { const px = 1100 + R() * 450, py = 1100 + R() * 250; const [x, z] = P(px, py); if (polyDist(x, z, GULCHES[1].pl) < 15) continue; tryAdd(x, z, 12 + R() * 8, 9 + R() * 6); }
+    // near campus the real houses (OpenStreetMap); the procedural ones only where the data stops
+    const near = [];
+    if (MAP) for (const o of MAP.buildings) {
+      if (o.campus) continue;
+      const fb = footprintBox(o.ring);
+      if (fb.area < 12 || blocked(fb.x, fb.z, 3)) continue;
+      items.push({ x: fb.x, z: fb.z, w: fb.w, d: fb.d, h: 3 + R() * 1.4, rot: fb.rot }); near.push(fb);
+    }
+    const inData = (x, z) => { if (!T) return false; const [X, Z] = realXZ(x, z); return X > T.x0 + 60 && X < T.x0 + T.nx - 60 && Z > T.z0 + 60 && Z < T.z0 + T.nz - 60; };
+    const tryAdd0 = tryAdd;
+    tryAdd = (x, z, w, d) => { if (!inData(x, z)) tryAdd0(x, z, w, d); };
+    for (let i = 0; i < 2500 && items.length < 60 + near.length; i++) { const px = R() * 560, py = 700 + R() * 600; if (py < hwyY(px) + 45) continue; const [x, z] = P(px, py); tryAdd(x, z, 10 + R() * 6, 8 + R() * 5); }
+    for (let i = 0; i < 1500 && items.length < 85 + near.length; i++) { const px = 600 + R() * 450, py = 1235 + R() * 120; const [x, z] = P(px, py); tryAdd(x, z, 10 + R() * 6, 8 + R() * 5); }
+    for (let i = 0; i < 1500 && items.length < 105 + near.length; i++) { const px = 1100 + R() * 450, py = 1100 + R() * 250; const [x, z] = P(px, py); if (polyDist(x, z, GULCHES[1].pl) < 15) continue; tryAdd(x, z, 12 + R() * 8, 9 + R() * 6); }
     // Waimea town to the east and south-east
-    for (let i = 0; i < 8000 && items.length < 460; i++) {
+    for (let i = 0; i < 8000 && items.length < 460 + near.length; i++) {
       const x = 450 + R() * 1300, z = -500 + R() * 1500;
       if (x < 650 && z < 250 && z > -280) continue;
       tryAdd(x, z, 9 + R() * 8, 8 + R() * 6);
@@ -2840,9 +3060,23 @@ function createWorld(canvas) {
   const field = { x: TRACK.x, z: TRACK.z, rot: TRACK.rot, halfL: FIELD_L / 2, halfW: FIELD_W / 2, rIn: R_IN, rOut: R_OUT, TL, y: groundH(0, 0) };
   tennis.inside = (x, z) => { const [lx, lz] = toLocal(tennis, x, z); return Math.abs(lx) < tennis.hw - 0.3 && Math.abs(lz) < tennis.hd - 0.3; };
   return { scene, renderer, camera, groundH, colliders, flags, C, spawn, bounds, update, setTime, setQuality, times: TIMES, get timeKey() { return timeKey; },
-    seats, carts, placeCart, cartSeat, field, tennis, pool, inPool, cat: cat.g, toLocal, toWorld, roomAt, boards, nook: NOOK,
+    seats, carts, placeCart, cartSeat, field, tennis, pool, inPool, cat: cat.g, toLocal, toWorld, roomAt, boards, nook: NOOK, lightDir, entrance: ENTRANCE, place: PLACE, compass: COMPASS, newCart: () => makeCart(),
+    roads: ROADS.map((r) => ({ kind: r.kind, w: r.w, pts: r.pts.map(([px, py]) => P(px, py)) })),
+    // where the layout put things, in the game's frame, plus the fit back to the map data (for checking in QGIS)
+    layout: { fit: FIT, buildings: BUILDINGS.map((b) => ({ x: b.x, z: b.z, w: b.w, d: b.d, rot: b.rot, label: b.label || '', osm: b.osm || '' })), pool: POOL, tennis: TENNIS, libDeck: LIB_DECK },
     setStars: (v) => { skyUniforms.uStars.value = v; } };
 }
 
-window.HPA = { createWorld };
+// the real map data (terrain heights, footprints, and the fit that ties the hand-made layout to them); null when
+// it can't be read, and the world falls back to the hand-made terrain
+async function loadMapData(base) {
+  try {
+    const get = (f) => fetch(base + f).then((r) => { if (!r.ok) throw new Error(f + ' ' + r.status); return r; });
+    const meta = await (await get('terrain.json')).json();
+    const [bin, bl, fit, official] = await Promise.all([get(meta.terrain.file).then(async (r) => (meta.terrain.file.endsWith('.txt') ? Uint8Array.from(atob((await r.text()).trim()), (c) => c.charCodeAt(0)).buffer : r.arrayBuffer())), get('buildings.json').then((r) => r.json()), get('old_frame_fit.json').then((r) => r.json()),
+      get('official_map.json').then((r) => r.json()).catch(() => null)]);
+    return { meta, terrain: Object.assign({}, meta.terrain, { h: new Uint16Array(bin) }), buildings: bl.buildings, fit, official };
+  } catch (e) { console.warn('map data not loaded, using the hand-made terrain:', e.message); return null; }
+}
+window.HPA = { createWorld, loadMapData };
 })();

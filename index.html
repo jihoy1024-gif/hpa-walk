@@ -303,9 +303,9 @@ body { font-family: var(--body); overflow: hidden; }
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="world.js?v=20"></script>
+<script src="world.js?v=21"></script>
 <script>
-(() => {
+(async () => {
 'use strict';
 const $ = (id) => document.getElementById(id);
 const COLORS = ['#4f8a3a', '#f28cb4', '#f4efe2', '#f2b84b', '#e0533d', '#9b6dd6']; // lei: maile green, pink, white plumeria, ʻilima, red, orchid
@@ -313,7 +313,8 @@ const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ---------- world (terrain, campus, sky, light) lives in world.js ----------
 const canvas = $('c');
-const W = window.HPA.createWorld(canvas);
+// the real map (lidar terrain, building footprints, the official campus map) from data/; without it the hand-made one
+const W = window.HPA.createWorld(canvas, await window.HPA.loadMapData('data/'));
 const { scene, renderer, camera, groundH, colliders, C } = W;
 
 // ---------- hearts ----------
